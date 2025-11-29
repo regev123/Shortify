@@ -1,4 +1,4 @@
-# �� TinyURL Service
+# TinyURL Service
 
 A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring custom caching, H2 database, and scalable architecture following industry best practices.
 
