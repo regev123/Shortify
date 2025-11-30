@@ -1,10 +1,10 @@
-# Load Test Script for Create Service
-# Sends 10,000 URLs to the create service
+# Load Test Script for Create Service (via API Gateway)
+# Sends 10,000 URLs to the create service through the API Gateway
 # Run: .\load-test-create-service.ps1
 
 param(
     [int]$UrlCount = 10000,
-    [string]$CreateServiceUrl = "http://localhost:8081",
+    [string]$CreateServiceUrl = "http://localhost:8080",
     [string]$OutputFile = "short-urls.txt",
     [int]$Concurrency = 20  # Number of parallel requests
 )
@@ -14,15 +14,15 @@ Write-Host "Create Service Load Test" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 Write-Host "Configuration:" -ForegroundColor Yellow
-Write-Host "  Create Service URL: $CreateServiceUrl" -ForegroundColor White
+Write-Host "  API Gateway URL: $CreateServiceUrl" -ForegroundColor White
 Write-Host "  Number of URLs: $UrlCount" -ForegroundColor White
 Write-Host "  Concurrency: $Concurrency parallel requests" -ForegroundColor White
 Write-Host "  Output File: $OutputFile`n" -ForegroundColor White
 
-# Check if create service is running
-Write-Host "[1/4] Checking create service health..." -ForegroundColor Yellow
+# Check if API Gateway and create service are running
+Write-Host "[1/4] Checking API Gateway and create service health..." -ForegroundColor Yellow
 try {
-    $healthResponse = Invoke-WebRequest -Uri "$CreateServiceUrl/api/v1/create/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    $healthResponse = Invoke-WebRequest -Uri "$CreateServiceUrl/health/create" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
     if ($healthResponse.StatusCode -eq 200) {
         Write-Host "  Create service is healthy!`n" -ForegroundColor Green
     } else {
@@ -30,7 +30,7 @@ try {
     }
 } catch {
     Write-Host "  ERROR: Create service is not reachable at $CreateServiceUrl" -ForegroundColor Red
-    Write-Host "  Please make sure the create service is running on port 8081`n" -ForegroundColor Yellow
+    Write-Host "  Please make sure the API Gateway is running on port 8080`n" -ForegroundColor Yellow
     exit 1
 }
 
@@ -239,4 +239,3 @@ if ($successCount -eq $UrlCount) {
 } else {
     Write-Host "[WARNING] Some URLs failed to create. Check the output above for details.`n" -ForegroundColor Yellow
 }
-

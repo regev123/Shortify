@@ -1,10 +1,10 @@
-# Load Test Script for Lookup Service
-# Reads all URLs from the lookup service 5 times
+# Load Test Script for Lookup Service (via API Gateway)
+# Reads all URLs from the lookup service through the API Gateway 5 times
 # Run: .\load-test-lookup-service.ps1
 
 param(
     [int]$Iterations = 5,
-    [string]$LookupServiceUrl = "http://localhost:8082",
+    [string]$ApiGatewayUrl = "http://localhost:8080",
     [string]$ShortUrlsFile = "short-urls.txt",
     [int]$Concurrency = 20  # Number of parallel requests
 )
@@ -14,23 +14,25 @@ Write-Host "Lookup Service Load Test" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 Write-Host "Configuration:" -ForegroundColor Yellow
-Write-Host "  Lookup Service URL: $LookupServiceUrl" -ForegroundColor White
+Write-Host "  API Gateway URL: $ApiGatewayUrl" -ForegroundColor White
 Write-Host "  Iterations: $Iterations" -ForegroundColor White
 Write-Host "  Concurrency: $Concurrency parallel requests" -ForegroundColor White
 Write-Host "  Short URLs File: $ShortUrlsFile`n" -ForegroundColor White
 
-# Check if lookup service is running
-Write-Host "[1/5] Checking lookup service health..." -ForegroundColor Yellow
+# Check if API Gateway and lookup service are running
+Write-Host "[1/5] Checking API Gateway and lookup service health..." -ForegroundColor Yellow
 try {
-    $healthResponse = Invoke-WebRequest -Uri "$LookupServiceUrl/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    $healthResponse = Invoke-WebRequest -Uri "$ApiGatewayUrl/health/lookup" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
     if ($healthResponse.StatusCode -eq 200) {
-        Write-Host "  Lookup service is healthy!`n" -ForegroundColor Green
+        Write-Host "  API Gateway and lookup service are healthy!`n" -ForegroundColor Green
     } else {
-        Write-Host "  WARNING: Lookup service returned status code $($healthResponse.StatusCode)" -ForegroundColor Yellow
+        Write-Host "  WARNING: API Gateway returned status code $($healthResponse.StatusCode)" -ForegroundColor Yellow
     }
 } catch {
-    Write-Host "  ERROR: Lookup service is not reachable at $LookupServiceUrl" -ForegroundColor Red
-    Write-Host "  Please make sure the lookup service is running on port 8082`n" -ForegroundColor Yellow
+    Write-Host "  ERROR: API Gateway is not reachable at $ApiGatewayUrl" -ForegroundColor Red
+    Write-Host "  Please make sure:" -ForegroundColor Yellow
+    Write-Host "    1. API Gateway is running on port 8080" -ForegroundColor Yellow
+    Write-Host "    2. Lookup service is running on port 8082`n" -ForegroundColor Yellow
     exit 1
 }
 
@@ -96,7 +98,7 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         
         # Create scriptblock
         $scriptBlock = {
-            param($shortCode, $lookupServiceUrl)
+            param($shortCode, $apiGatewayUrl)
             
             $result = @{
                 Success = $false
@@ -108,8 +110,8 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
             }
             
             try {
-                # Send GET request with redirect handling
-                $request = [System.Net.HttpWebRequest]::Create("$lookupServiceUrl/$shortCode")
+                # Send GET request via API Gateway with redirect handling
+                $request = [System.Net.HttpWebRequest]::Create("$apiGatewayUrl/$shortCode")
                 $request.Method = "GET"
                 $request.Timeout = 10000
                 $request.AllowAutoRedirect = $false
@@ -149,7 +151,7 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         
         [void]$powershell.AddScript($scriptBlock.ToString())
         [void]$powershell.AddArgument($urlData.ShortCode)
-        [void]$powershell.AddArgument($LookupServiceUrl)
+        [void]$powershell.AddArgument($ApiGatewayUrl)
         
         $handle = $powershell.BeginInvoke()
         [void]$runspaces.Add(@{
@@ -275,4 +277,3 @@ if ($totalErrors -eq 0 -and $totalSuccess -gt 0) {
 } else {
     Write-Host "[INFO] No successful lookups. Make sure URLs exist in the database.`n" -ForegroundColor Yellow
 }
-

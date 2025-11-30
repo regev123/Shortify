@@ -52,17 +52,6 @@ public class LookupUrlController {
     }
     
     /**
-     * Health check endpoint for Lookup Service
-     * Used by load balancers and monitoring systems
-     * 
-     * @return ResponseEntity with OK status
-     */
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Lookup Service is healthy");
-    }
-    
-    /**
      * Maps error code to appropriate HTTP status
      * Follows Open/Closed Principle - can be extended with new error codes without modification
      * 

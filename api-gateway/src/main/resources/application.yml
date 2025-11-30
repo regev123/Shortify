@@ -1,0 +1,147 @@
+spring:
+  application:
+    name: api-gateway
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      username: default
+      password:
+      timeout: 10000ms
+      connect-timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 10000ms
+        shutdown-timeout: 200ms
+
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOriginPatterns: "*"
+            allowedMethods: [GET, POST, PUT, DELETE, OPTIONS, HEAD]
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      routes:
+        # -------------------------
+        # HEALTH CHECK ROUTES (must be first)
+        # Using /health/* pattern to avoid Actuator path conflict
+        # -------------------------
+        # CREATE SERVICE HEALTH
+        - id: create-service-health
+          uri: http://localhost:8081
+          order: -1
+          predicates:
+            - Path=/health/create
+          filters:
+            - SetPath=/actuator/health
+
+        - id: create-service-readiness
+          uri: http://localhost:8081
+          order: -1
+          predicates:
+            - Path=/health/create/readiness
+          filters:
+            - SetPath=/actuator/health/readiness
+
+        - id: create-service-liveness
+          uri: http://localhost:8081
+          order: -1
+          predicates:
+            - Path=/health/create/liveness
+          filters:
+            - SetPath=/actuator/health/liveness
+
+        # LOOKUP SERVICE HEALTH
+        - id: lookup-service-health
+          uri: http://localhost:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup
+          filters:
+            - SetPath=/actuator/health
+
+        - id: lookup-service-readiness
+          uri: http://localhost:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup/readiness
+          filters:
+            - SetPath=/actuator/health/readiness
+
+        - id: lookup-service-liveness
+          uri: http://localhost:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup/liveness
+          filters:
+            - SetPath=/actuator/health/liveness
+
+        # -------------------------
+        # CREATE SERVICE (business)
+        # -------------------------
+        - id: create-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/create/**
+          filters:
+            - AddRequestHeader=X-Gateway-Service, create-service
+            # Rate limiting disabled - uncomment to re-enable
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 100
+            #     redis-rate-limiter.burstCapacity: 200
+            #     redis-rate-limiter.requestedTokens: 1
+            #     key-resolver: "#{@ipKeyResolver}"
+
+        # -------------------------
+        # LOOKUP SERVICE (short URL)
+        # -------------------------
+        - id: lookup-service-short-url
+          uri: http://localhost:8082
+          predicates:
+            - Path=/{shortUrl:[a-zA-Z0-9]+}
+          filters:
+            - AddRequestHeader=X-Gateway-Service, lookup-service
+            # Rate limiting disabled - uncomment to re-enable
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 1000
+            #     redis-rate-limiter.burstCapacity: 2000
+            #     redis-rate-limiter.requestedTokens: 1
+            #     key-resolver: "#{@ipKeyResolver}"
+
+      default-filters:
+        - AddResponseHeader=X-Gateway-Version, 1.0.0
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  observations:
+    key-values:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    com.tinyurl.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: INFO
+    reactor.netty: INFO

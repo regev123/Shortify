@@ -49,6 +49,8 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **Cache-Aside Pattern** - Efficient cache invalidation
 - ✅ **Input Validation** - Comprehensive URL and short code validation
 - ✅ **Error Code System** - Type-safe error handling with ErrorCode enum
+- ✅ **API Gateway** - Spring Cloud Gateway with routing, CORS, and health endpoints
+- ✅ **Spring Boot Actuator** - Built-in health, readiness, and liveness probes
 
 ### Quality & Maintainability
 
@@ -69,6 +71,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 | -------------- | --------------------- | --------- |
 | **Language**   | Java                  | 17        |
 | **Framework**  | Spring Boot           | 3.2.0     |
+| **API Gateway**| Spring Cloud Gateway  | 4.0+      |
 | **ORM**        | Spring Data JPA       | 3.2.0     |
 | **Database**   | PostgreSQL            | 15+       |
 | **Cache**      | Redis                 | 7+        |
@@ -80,7 +83,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 
 ### Microservices Architecture
 
-The application is built as a **Maven multi-module project** with three modules:
+The application is built as a **Maven multi-module project** with four modules:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -91,30 +94,30 @@ The application is built as a **Maven multi-module project** with three modules:
        ┌───────┴───────┐  ┌───────┴────────┐
        │               │  │                │
        ▼               ▼  ▼                ▼
-┌──────────┐   ┌──────────────┐   ┌──────────────┐
-│  Common  │   │   Create    │   │   Lookup     │
-│  Module  │   │   Service    │   │   Service    │
-│          │   │              │   │              │
-│ • Entity │   │ • Controller │   │ • Controller │
-│ • Error  │   │ • Service    │   │ • Service    │
-│   Codes  │   │ • Repository │   │ • Repository │
-│          │   │ • Utils      │   │ • Cache      │
-│          │   │ • Factory    │   │ • Cleanup    │
-│          │   │ • Constants  │   │ • Constants  │
-│          │   │ • Exceptions │   │ • Exceptions  │
-└────┬─────┘   └──────┬───────┘   └──────┬───────┘
-     │                 │                  │
-     └────────┬────────┴────────┬─────────┘
-              │                 │
-              ▼                 ▼
-    ┌──────────────────────────────────┐
-    │      Shared Database             │
-    │  PostgreSQL (Primary + Replicas) │
-    └──────────────────────────────────┘
-              │
-              ▼
-    ┌──────────────────────────────────┐
-    │      Redis Cache (Lookup Only)   │
+┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│  Common  │   │   Create    │   │   Lookup     │   │   API        │
+│  Module  │   │   Service    │   │   Service    │   │   Gateway    │
+│          │   │              │   │              │   │              │
+│ • Entity │   │ • Controller │   │ • Controller │   │ • Routing    │
+│ • Error  │   │ • Service    │   │ • Service    │   │ • Rate Limit │
+│   Codes  │   │ • Repository │   │ • Repository │   │ • CORS       │
+│          │   │ • Utils      │   │ • Cache      │   │ • Health     │
+│          │   │ • Factory    │   │ • Cleanup    │   │              │
+│          │   │ • Constants  │   │ • Constants  │   │              │
+│          │   │ • Exceptions │   │ • Exceptions  │   │              │
+└────┬─────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+     │                 │                  │                  │
+     └────────┬────────┴────────┬─────────┘                  │
+              │                 │                            │
+              ▼                 ▼                            │
+    ┌──────────────────────────────────┐                    │
+    │      Shared Database             │                    │
+    │  PostgreSQL (Primary + Replicas) │                    │
+    └──────────────────────────────────┘                    │
+              │                                              │
+              ▼                                              │
+    ┌──────────────────────────────────┐                    │
+    │      Redis Cache (Lookup Only)   │◄───────────────────┘
     └──────────────────────────────────┘
 ```
 
@@ -123,9 +126,22 @@ The application is built as a **Maven multi-module project** with three modules:
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                        Client                            │
-└──────┬──────────────────────────────┬────────────────────┘
-       │                              │
-       ▼                              ▼
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   API Gateway   │
+                    │   Port: 8080    │
+                    │                 │
+                    │  • Routing      │
+                    │  • Rate Limit  │
+                    │  • CORS         │
+                    │  • Health      │
+                    └─────┬─────┬─────┘
+                          │     │
+              ┌───────────┘     └───────────┐
+              │                              │
+              ▼                              ▼
 ┌──────────────────────┐    ┌──────────────────────┐
 │  Create Service      │    │  Lookup Service       │
 │  Port: 8081         │    │  Port: 8082           │
@@ -364,7 +380,14 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    mvn clean install
    ```
 
-6. **Run the services**
+6. **Build the project**
+
+   ```bash
+   # Build all modules (common builds first, then services, then gateway)
+   mvnw clean install
+   ```
+
+7. **Run the services**
 
    ```bash
    # Terminal 1: Start Create Service (Port 8081)
@@ -376,12 +399,22 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    cd lookup-service
    mvnw spring-boot:run
    # Or: java -jar target/lookup-service-1.0.0.jar
+   
+   # Terminal 3: Start API Gateway (Port 8080)
+   cd api-gateway
+   mvnw spring-boot:run
+   # Or: java -jar target/api-gateway-1.0.0.jar
    ```
 
-7. **Verify services are running**
+8. **Verify services are running**
    ```
-   Create Service: http://localhost:8081/api/v1/create/health
-   Lookup Service: http://localhost:8082/health
+   API Gateway: http://localhost:8080/actuator/health
+   Create Service (via Gateway): http://localhost:8080/health/create
+   Lookup Service (via Gateway): http://localhost:8080/health/lookup
+   
+   # Direct service endpoints (for debugging)
+   Create Service: http://localhost:8081/actuator/health
+   Lookup Service: http://localhost:8082/actuator/health
    ```
 
 ## 🗄 Database Setup
@@ -435,11 +468,22 @@ Use pgAdmin or any PostgreSQL client to connect.
 
 ## 📚 API Documentation
 
-### Create Service (Port 8081)
+All API requests should go through the **API Gateway** at `http://localhost:8080`.
+
+### API Gateway (Port 8080)
+
+The API Gateway provides a single entry point for all services with:
+- ✅ Request routing to appropriate microservices
+- ✅ Rate limiting (currently disabled, can be re-enabled)
+- ✅ CORS configuration
+- ✅ Health check endpoints
+- ✅ Request/response logging
+
+### Create Service (via API Gateway)
 
 #### 1. Create Short URL
 
-**Endpoint:** `POST http://localhost:8081/api/v1/create/shorten`
+**Endpoint:** `POST http://localhost:8080/api/v1/create/shorten`
 
 **Request:**
 
@@ -474,11 +518,11 @@ Use pgAdmin or any PostgreSQL client to connect.
 }
 ```
 
-### Lookup Service (Port 8082)
+### Lookup Service (via API Gateway)
 
 #### 2. Redirect to Original URL
 
-**Endpoint:** `GET http://localhost:8082/{shortUrl}`
+**Endpoint:** `GET http://localhost:8080/{shortUrl}`
 
 **Example:** `GET http://localhost:8082/a3F9k1`
 
@@ -495,34 +539,42 @@ Use pgAdmin or any PostgreSQL client to connect.
 }
 ```
 
+### Health Check Endpoints (via API Gateway)
+
+- **API Gateway Health:** `GET http://localhost:8080/actuator/health`
+- **Create Service Health:** `GET http://localhost:8080/health/create`
+- **Lookup Service Health:** `GET http://localhost:8080/health/lookup`
+- **Gateway Routes:** `GET http://localhost:8080/actuator/gateway/routes`
+
 ### Example cURL Commands
 
 ```bash
-# Create a short URL (Create Service - Port 8081)
-curl -X POST http://localhost:8081/api/v1/create/shorten \
+# Create a short URL (via API Gateway)
+curl -X POST http://localhost:8080/api/v1/create/shorten \
   -H "Content-Type: application/json" \
   -d '{
     "originalUrl": "https://www.google.com",
     "baseUrl": "https://tiny.url"
   }'
 
-# Redirect to original URL (Lookup Service - Port 8082)
-curl -L http://localhost:8082/a3F9k1
+# Redirect to original URL (via API Gateway)
+curl -L http://localhost:8080/a3F9k1
 
 # Or without following redirects (see response headers)
-curl -I http://localhost:8082/a3F9k1
+curl -I http://localhost:8080/a3F9k1
 
-# Test with invalid URL (Create Service)
-curl -X POST http://localhost:8081/api/v1/create/shorten \
+# Test with invalid URL (via API Gateway)
+curl -X POST http://localhost:8080/api/v1/create/shorten \
   -H "Content-Type: application/json" \
   -d '{
     "originalUrl": "invalid-url",
     "baseUrl": "https://tiny.url"
   }'
 
-# Health checks
-curl http://localhost:8081/api/v1/create/health
-curl http://localhost:8082/health
+# Health checks (via API Gateway)
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/health/create
+curl http://localhost:8080/health/lookup
 ```
 
 ## 💡 Implementation Highlights
@@ -801,6 +853,63 @@ logging:
     com.tinyurl: DEBUG
 ```
 
+**API Gateway** (`api-gateway/src/main/resources/application.yml`):
+```yaml
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        # Create Service Route
+        - id: create-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/create/**
+          filters:
+            - AddRequestHeader=X-Gateway-Service, create-service
+            # Rate limiting (currently disabled, uncomment to enable)
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 100
+            #     redis-rate-limiter.burstCapacity: 200
+        
+        # Lookup Service Route
+        - id: lookup-service-short-url
+          uri: http://localhost:8082
+          predicates:
+            - Path=/{shortUrl:[a-zA-Z0-9]+}
+          filters:
+            - AddRequestHeader=X-Gateway-Service, lookup-service
+        
+        # Health Check Routes
+        - id: create-service-health
+          uri: http://localhost:8081
+          order: -1
+          predicates:
+            - Path=/health/create
+          filters:
+            - SetPath=/actuator/health
+        
+        - id: lookup-service-health
+          uri: http://localhost:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup
+          filters:
+            - SetPath=/actuator/health
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+```
+
 ### Cache Settings (Lookup Service Only)
 
 - **TTL**: Adaptive (10 min default, 15 min warm, 30 min hot)
@@ -808,6 +917,15 @@ logging:
 - **Implementation**: Redis
 - **Connection Pool**: Lettuce with connection pooling
 - **Access-based TTL**: Frequently accessed URLs cached longer
+
+### API Gateway Settings
+
+- **Port**: 8080 (main entry point)
+- **Routing**: Routes requests to create-service (8081) and lookup-service (8082)
+- **CORS**: Configured with `allowedOriginPatterns` for cross-origin requests
+- **Rate Limiting**: Infrastructure in place (currently disabled, can be re-enabled)
+- **Health Endpoints**: `/health/create` and `/health/lookup` route to service health checks
+- **Actuator**: Exposes gateway routes and health information
 
 ### Database Settings
 
@@ -838,7 +956,10 @@ mvn test jacoco:report
 - [x] Add Redis for distributed caching ✅
 - [x] Add read replicas ✅
 - [x] Implement health checks ✅
-- [ ] Implement rate limiting
+- [x] Implement API Gateway ✅
+- [x] Spring Boot Actuator health endpoints ✅
+- [x] CORS configuration ✅
+- [x] Rate limiting infrastructure (currently disabled, can be re-enabled) ✅
 - [ ] Add HTTPS support
 - [ ] Implement custom short URL support
 
@@ -923,12 +1044,22 @@ tinyurl-service/
 │           ├── UrlNotFoundException.java
 │           └── UrlExpiredException.java
 │
+├── api-gateway/                           # API Gateway (Port 8080)
+│   ├── pom.xml
+│   └── src/main/java/com/tinyurl/gateway/
+│       ├── ApiGatewayApplication.java     # Main application class
+│       ├── config/
+│       │   ├── GatewayConfig.java         # Gateway configuration
+│       │   └── RateLimiterConfig.java      # Rate limiting config
+│       └── util/
+│           └── IpAddressExtractor.java    # IP extraction utility
+│
 └── scripts/
     ├── Database/
     │   ├── docker-compose-postgresql.yml
     │   └── start-postgresql-with-replication.ps1
-    ├── load-test-create-service.ps1      # Load test for create service
-    └── load-test-lookup-service.ps1      # Load test for lookup service
+    ├── load-test-create-service.ps1      # Load test for create service (via API Gateway)
+    └── load-test-lookup-service.ps1      # Load test for lookup service (via API Gateway)
 ```
 
 ### Build Order
@@ -937,8 +1068,9 @@ Maven builds modules in this order:
 1. **common** - Shared code (builds first)
 2. **create-service** - Depends on common
 3. **lookup-service** - Depends on common
+4. **api-gateway** - Independent module (no dependency on common)
 
-Both services include the `common` module JAR as a dependency.
+Both services include the `common` module JAR as a dependency. The API Gateway is independent and routes requests to the services.
 
 ## 🎯 Key Design Decisions
 

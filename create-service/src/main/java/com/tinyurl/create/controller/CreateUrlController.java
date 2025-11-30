@@ -62,17 +62,6 @@ public class CreateUrlController {
     }
     
     /**
-     * Health check endpoint for Create Service
-     * Used by load balancers and monitoring systems
-     * 
-     * @return ResponseEntity with OK status
-     */
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Create Service is healthy");
-    }
-    
-    /**
      * Extracts base URL from request or uses provided one
      * 
      * @param request the create URL request
