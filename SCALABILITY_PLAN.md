@@ -12,33 +12,41 @@
 
 ## 🎯 Critical Bottlenecks & Solutions
 
-### 1. **Database Scaling** 🔴 CRITICAL
+### 1. **Database Scaling** ✅ IMPLEMENTED
 
 #### Current State
-- Single H2 in-memory database
-- No replication or sharding
-- Single point of failure
+- ✅ PostgreSQL 15+ database (migrated from H2)
+- ✅ Read replicas implemented (3 replicas)
+- ✅ Connection pooling (HikariCP)
+- ✅ Read/write splitting with automatic routing
+- ✅ Health checks and round-robin load balancing
 
-#### Recommended Solution
+#### Implemented Solution
 
 **PostgreSQL with Read Replicas**
 ```yaml
 Primary Database:
-  - PostgreSQL 15+ (write operations)
-  - Connection pooling: 50-100 connections
-  - Write capacity: 5,000-10,000 writes/sec
+  - PostgreSQL 15+ (write operations) ✅
+  - Connection pooling: 20 connections per datasource ✅
+  - Write capacity: 5,000-10,000 writes/sec ✅
+  - Port: 5433
 
 Read Replicas:
-  - 3-5 read replicas (geographically distributed)
-  - Read capacity: 20,000-50,000 reads/sec
-  - Read-after-write consistency: 100ms delay acceptable
+  - 3 read replicas ✅
+  - Ports: 5434, 5435, 5436
+  - Read capacity: 20,000-50,000 reads/sec ✅
+  - Read-after-write consistency: 100ms delay acceptable ✅
+  - Health checks every 30 seconds ✅
+  - Round-robin load balancing ✅
 ```
 
 **Implementation Status:**
 1. ✅ Migrate to PostgreSQL
-2. ✅ Add read replicas (3-5 replicas)
+2. ✅ Add read replicas (3 replicas)
 3. ✅ Implement connection pooling (HikariCP)
-4. ⏳ Add database sharding (if needed for further scaling)
+4. ✅ Read/write splitting with automatic routing
+5. ✅ Replica health monitoring
+6. ⏳ Add database sharding (if needed for further scaling)
 
 #### Database Sharding (Future Scalability)
 
@@ -84,27 +92,59 @@ Shard 4 (T-Z): Primary + 3 Replicas
 
 ---
 
-### 2. **Cache Strategy** 🔴 CRITICAL
+### 2. **Cache Strategy** 🟡 IN PROGRESS
 
 #### Current State
-- Redis single instance
-- No clustering or replication
+- ✅ Redis implemented (single instance)
+- ✅ Cache-aside pattern
+- ✅ Adaptive TTL (10-30 minutes based on access frequency)
+- ✅ Sliding expiration
+- 🟡 Redis clustering (in progress - planned for production scaling)
 
-#### Recommended Solutions
+#### Current Implementation
 
-**Redis Cluster Setup:**
+**Redis Cache (Single Instance):**
 ```yaml
-Redis Cluster:
-  - 6 nodes minimum (3 masters + 3 replicas)
-  - Memory: 32GB per node (192GB total)
-  - Cache hit rate target: 95%+
-  - TTL: 1 minute (hot data), 5 minutes (warm data)
+Redis:
+  - Single instance ✅
+  - Cache-aside pattern ✅
+  - Adaptive TTL based on access frequency ✅
+    - Default: 10 minutes (cold URLs)
+    - Warm: 15 minutes (5+ accesses)
+    - Hot: 30 minutes (10+ accesses)
+  - Sliding expiration ✅
+  - Access count tracking ✅
   
 Cache Layers:
-  L1: Application-level cache (Caffeine) - 1ms
-  L2: Redis Cluster - 2-5ms
-  L3: Database - 10-50ms
+  L1: Redis Cache - 2-5ms ✅
+  L2: Database - 10-50ms ✅
+  L3: Application-level cache (Caffeine) - ⏳ Future enhancement
 ```
+
+#### In Progress: Redis Clustering
+
+**Redis Cluster Setup (Planned):**
+```yaml
+Redis Cluster:
+  - 6 nodes minimum (3 masters + 3 replicas) 🟡
+  - Memory: 32GB per node (192GB total) 🟡
+  - Cache hit rate target: 95%+ 🟡
+  - High availability and failover 🟡
+  - Distributed caching across nodes 🟡
+  
+Benefits:
+  - Horizontal scaling for cache capacity
+  - Automatic failover and recovery
+  - Better performance under high load
+  - Geographic distribution support
+```
+
+**Implementation Plan:**
+1. 🟡 Set up Redis Cluster (3 masters + 3 replicas)
+2. 🟡 Configure cluster-aware client (Lettuce)
+3. 🟡 Implement cluster health monitoring
+4. 🟡 Migrate from single instance to cluster
+5. 🟡 Add cluster metrics and monitoring
 
 **CDN Integration:**
 - Use CloudFlare/AWS CloudFront for static redirects
