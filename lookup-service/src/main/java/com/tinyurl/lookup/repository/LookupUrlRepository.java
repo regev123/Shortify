@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -44,6 +45,22 @@ public interface LookupUrlRepository extends JpaRepository<UrlMapping, Long> {
      * @param batchSize maximum number of URLs to delete in this batch
      * @return number of URLs deleted
      */
+    /**
+     * Finds URLs that will be deleted (to get their shortCodes before deletion).
+     * Used to publish deletion events to Kafka.
+     */
+    @Query(value = "SELECT * FROM url_mappings " +
+                   "WHERE (" +
+                   "  (last_accessed_at < :accessCutoffDate OR (last_accessed_at IS NULL AND created_at < :accessCutoffDate)) " +
+                   "  OR expires_at < :currentTime" +
+                   ") " +
+                   "LIMIT :batchSize",
+           nativeQuery = true)
+    List<UrlMapping> findUnusedOrExpiredUrls(
+            @Param("accessCutoffDate") LocalDateTime accessCutoffDate,
+            @Param("currentTime") LocalDateTime currentTime,
+            @Param("batchSize") int batchSize);
+    
     @Modifying
     @Query(value = "WITH ids_to_delete AS (" +
                    "  SELECT id FROM url_mappings " +

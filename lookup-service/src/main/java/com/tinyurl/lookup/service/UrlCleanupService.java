@@ -1,15 +1,21 @@
 package com.tinyurl.lookup.service;
 
+import com.tinyurl.entity.UrlMapping;
+import com.tinyurl.event.UrlDeletedEvent;
 import com.tinyurl.lookup.repository.LookupUrlRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Service for cleaning up unused URLs
@@ -24,6 +30,7 @@ import java.time.LocalDateTime;
 public class UrlCleanupService {
     
     private final LookupUrlRepository urlMappingRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     
     @Value("${url.cleanup.retention-months:6}")
     private int retentionMonths;
@@ -33,6 +40,9 @@ public class UrlCleanupService {
     
     @Value("${url.cleanup.batch-size:1000}")
     private int batchSize;
+    
+    @Value("${kafka.topic.url-deleted:url-deleted-events}")
+    private String urlDeletedTopic;
     
     /**
      * Scheduled cleanup job that runs daily at 2 AM
@@ -53,17 +63,18 @@ public class UrlCleanupService {
         
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime accessCutoffDate = now.minusMonths(retentionMonths);
-        long deletedCount = 0;
         
         try {
             // Delete in batches, each batch in its own transaction
             // This prevents long-running transactions and connection pool exhaustion
             boolean hasMore = true;
             while (hasMore) {
-                int deleted = deleteBatch(accessCutoffDate, now);
-                deletedCount += deleted;
+                List<String> deletedShortCodes = deleteBatch(accessCutoffDate, now);
                 
-                if (deleted < batchSize) {
+                // Publish deletion events to Kafka for stats service cleanup
+                publishDeletionEvents(deletedShortCodes, now);
+                
+                if (deletedShortCodes.size() < batchSize) {
                     hasMore = false;
                 } else {
                     // Small delay between batches to avoid overwhelming the database
@@ -88,11 +99,68 @@ public class UrlCleanupService {
      * 
      * @param accessCutoffDate cutoff date for access-based deletion
      * @param currentTime current time for expiration check
-     * @return number of URLs deleted in this batch
+     * @return list of shortCodes that were deleted
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private int deleteBatch(LocalDateTime accessCutoffDate, LocalDateTime currentTime) {
-        return urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, currentTime, batchSize);
+    private List<String> deleteBatch(LocalDateTime accessCutoffDate, LocalDateTime currentTime) {
+        // First, get the URLs that will be deleted (to get their shortCodes)
+        List<UrlMapping> urlsToDelete = urlMappingRepository.findUnusedOrExpiredUrls(
+                accessCutoffDate, currentTime, batchSize);
+        
+        // Extract shortCodes before deletion
+        List<String> shortCodes = urlsToDelete.stream()
+                .map(UrlMapping::getShortUrl)
+                .toList();
+        
+        // Delete the URLs
+        if (!shortCodes.isEmpty()) {
+            urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, currentTime, batchSize);
+        }
+        
+        return shortCodes;
+    }
+    
+    /**
+     * Publish URL deletion events to Kafka for stats service cleanup.
+     * Events are sent asynchronously to avoid blocking the cleanup job.
+     */
+    private void publishDeletionEvents(List<String> deletedShortCodes, LocalDateTime deletionTime) {
+        if (deletedShortCodes.isEmpty()) {
+            return;
+        }
+        
+        long timestamp = Instant.now().toEpochMilli();
+        
+        for (String shortCode : deletedShortCodes) {
+            try {
+                // Determine deletion reason based on expiration
+                String reason = deletionTime.isAfter(LocalDateTime.now()) ? "UNUSED" : "EXPIRED";
+                
+                UrlDeletedEvent event = UrlDeletedEvent.builder()
+                        .shortCode(shortCode)
+                        .reason(reason)
+                        .timestamp(timestamp)
+                        .build();
+                
+                // Send to Kafka asynchronously
+                CompletableFuture<?> future = kafkaTemplate.send(urlDeletedTopic, shortCode, event);
+                
+                future.whenComplete((result, ex) -> {
+                    if (ex == null) {
+                        log.debug("Published URL deletion event for shortCode: {}", shortCode);
+                    } else {
+                        log.warn("Failed to publish URL deletion event for shortCode: {}", shortCode, ex);
+                        // Event is lost, but cleanup continues
+                        // In production, consider implementing a dead letter queue
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Error publishing deletion event for shortCode: {}", shortCode, e);
+                // Don't fail cleanup if Kafka is unavailable
+            }
+        }
+        
+        log.debug("Published {} URL deletion events to Kafka", deletedShortCodes.size());
     }
     
     /**

@@ -1,6 +1,7 @@
 package com.tinyurl.stats.controller;
 
 import com.tinyurl.event.ClickEvent;
+import com.tinyurl.event.UrlDeletedEvent;
 import com.tinyurl.stats.dto.ClickEventRequest;
 import com.tinyurl.stats.dto.PlatformStatisticsResponse;
 import com.tinyurl.stats.dto.UrlStatisticsResponse;
@@ -60,6 +61,35 @@ public class StatsController {
             log.debug("Successfully processed batch of {} click events", events.size());
         } catch (Exception e) {
             log.error("Error processing click event batch (size: {})", events.size(), e);
+            // In production, consider sending to dead letter queue instead of acknowledging
+            // For now, we acknowledge to prevent blocking the consumer
+            acknowledgment.acknowledge();
+        }
+    }
+    
+    /**
+     * Kafka consumer for URL deletion events.
+     * When URLs are deleted from the main database, this cleans up their statistics.
+     * Processes events in batches for efficiency.
+     */
+    @KafkaListener(topics = "${kafka.topic.url-deleted:url-deleted-events}", 
+                   containerFactory = "kafkaListenerContainerFactory")
+    public void consumeUrlDeletedEvents(
+            @Payload List<UrlDeletedEvent> events,
+            @Header(KafkaHeaders.RECEIVED_KEY) List<String> keys,
+            Acknowledgment acknowledgment) {
+        try {
+            // Process all deletion events in the batch
+            for (UrlDeletedEvent event : events) {
+                statsService.deleteStatisticsForUrl(event.getShortCode());
+                log.debug("Deleted statistics for shortCode: {} (reason: {})", 
+                        event.getShortCode(), event.getReason());
+            }
+            
+            // Acknowledge entire batch after processing
+            acknowledgment.acknowledge();
+        } catch (Exception e) {
+            log.error("Error processing URL deletion event batch (size: {})", events.size(), e);
             // In production, consider sending to dead letter queue instead of acknowledging
             // For now, we acknowledge to prevent blocking the consumer
             acknowledgment.acknowledge();

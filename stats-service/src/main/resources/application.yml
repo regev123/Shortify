@@ -66,6 +66,7 @@ server:
 kafka:
   topic:
     click-events: url-click-events
+    url-deleted: url-deleted-events
 
 # Stats Service Configuration
 stats:
@@ -74,7 +75,13 @@ stats:
     flush-interval-seconds: 5          # Flush batch every 5 seconds
   aggregation:
     update-interval-minutes: 10        # Update aggregated stats every 10 minutes
+    update-interval-ms: 600000        # Update interval in milliseconds (10 minutes = 600000ms)
     enabled: true                      # Enable scheduled aggregation
+  retention:
+    enabled: true                      # Enable data retention cleanup
+    keep-days: 90                      # Keep click events for last 90 days (older events are deleted)
+    cleanup-interval-hours: 24         # Run cleanup job every 24 hours (daily)
+    cleanup-interval-ms: 86400000     # Cleanup interval in milliseconds (24 hours = 86400000ms)
 
 management:
   endpoints:

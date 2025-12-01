@@ -94,6 +94,24 @@ public class StatsService {
         statisticsRepository.save(stats);
     }
     
+    /**
+     * Delete all statistics and click events for a deleted URL.
+     * Called when a URL deletion event is received from Kafka.
+     */
+    @Transactional
+    public void deleteStatisticsForUrl(String shortCode) {
+        try {
+            // Delete click events first (if any foreign key constraints exist)
+            clickEventRepository.deleteByShortCode(shortCode);
+            
+            // Delete statistics
+            statisticsRepository.deleteByShortCode(shortCode);
+        } catch (Exception e) {
+            log.error("Error deleting statistics for shortCode: {}", shortCode, e);
+            throw e; // Re-throw to trigger Kafka retry mechanism
+        }
+    }
+    
     public UrlStatisticsResponse getUrlStatistics(String shortCode) {
         UrlStatistics stats = statisticsRepository.findByShortCode(shortCode)
                 .orElse(UrlStatistics.builder()

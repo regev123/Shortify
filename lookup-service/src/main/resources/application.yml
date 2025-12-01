@@ -92,9 +92,12 @@ logging:
     com.tinyurl: DEBUG
     org.hibernate: WARN
     org.springframework.data.redis: DEBUG
+    org.apache.kafka: WARN  # Show Kafka warnings and errors
+    org.springframework.kafka: INFO  # Show Kafka producer/consumer info
 
 # Kafka Topic Configuration
 kafka:
   topic:
     click-events: url-click-events
+    url-deleted: url-deleted-events
 

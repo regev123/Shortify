@@ -52,9 +52,10 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **API Gateway** - Spring Cloud Gateway with routing, CORS, and health endpoints
 - ✅ **Spring Boot Actuator** - Built-in health, readiness, and liveness probes
 - ✅ **Stats Service** - Event-driven analytics service with Kafka integration
-- ✅ **Kafka Event Streaming** - Asynchronous event processing for click analytics
+- ✅ **Kafka Event Streaming** - Asynchronous event processing for click analytics and URL deletion events
 - ✅ **Batch Processing** - Optimized batch inserts and deferred statistics aggregation
 - ✅ **Performance Optimizations** - Handles 100M requests/day with single stats database
+- ✅ **Event-Driven Cleanup** - Kafka-based URL deletion events for automatic stats cleanup (no cross-database queries)
 
 ### Quality & Maintainability
 
@@ -64,7 +65,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **RESTful API** - Clean, intuitive endpoints
 - ✅ **Clean Architecture** - Separation of concerns, single responsibility
 - ✅ **Transaction Management** - ACID-compliant database operations with read/write splitting
-- ✅ **Comprehensive Logging** - Debug and info-level logging
+- ✅ **Focused Logging** - Error, warning, and debug logging only (no info-level noise)
 - ✅ **Interface Segregation** - Service interfaces for extensibility
 - ✅ **Dependency Inversion** - Abstractions, not concrete implementations
 - ✅ **Resource Management** - Proper cleanup with @PreDestroy hooks
@@ -250,8 +251,11 @@ The application is built as a **Maven multi-module project** with four modules:
 common/
 ├── entity/
 │   └── UrlMapping.java                    # Shared JPA entity
-└── constants/
-    └── ErrorCode.java                     # Shared error codes enum
+├── constants/
+│   └── ErrorCode.java                     # Shared error codes enum
+└── event/
+    ├── ClickEvent.java                    # Kafka click event DTO
+    └── UrlDeletedEvent.java              # Kafka URL deletion event DTO
 ```
 
 **Create Service** (Port 8081):
@@ -533,7 +537,7 @@ The API Gateway provides a single entry point for all services with:
 - ✅ Rate limiting (currently disabled, can be re-enabled)
 - ✅ CORS configuration
 - ✅ Health check endpoints
-- ✅ Request/response logging
+- ✅ Clean logging (errors/warnings/debug only)
 - ✅ Stats Service routing
 
 ### Create Service (via API Gateway)
@@ -747,7 +751,7 @@ public class RedisCacheService implements CacheService {
 - ✅ Automatic expiration after 1 minute
 - ✅ Input validation and error handling
 - ✅ Proper null handling
-- ✅ Comprehensive logging
+- ✅ Focused logging (errors/warnings/debug only)
 
 ### Read/Write Splitting
 
@@ -1131,8 +1135,10 @@ mvn test jacoco:report
 - [x] Rate limiting infrastructure (currently disabled, can be re-enabled) ✅
 - [x] Stats Service with Kafka integration ✅
 - [x] Event-driven architecture for analytics ✅
+- [x] Event-driven URL deletion cleanup (Kafka-based) ✅
 - [x] Batch processing for high throughput ✅
 - [x] Performance optimizations (100M requests/day) ✅
+- [x] Code cleanup (removed unused variables, removed log.info statements) ✅
 - [ ] Add HTTPS support
 - [ ] Implement custom short URL support
 
@@ -1168,8 +1174,11 @@ tinyurl-service/
 │   └── src/main/java/com/tinyurl/
 │       ├── entity/
 │       │   └── UrlMapping.java            # Shared JPA entity
-│       └── constants/
-│           └── ErrorCode.java             # Shared error codes enum
+│       ├── constants/
+│       │   └── ErrorCode.java             # Shared error codes enum
+│       └── event/
+│           ├── ClickEvent.java            # Kafka click event DTO
+│           └── UrlDeletedEvent.java      # Kafka URL deletion event DTO
 │
 ├── create-service/                        # Create Service (Port 8081)
 │   ├── pom.xml
@@ -1225,7 +1234,6 @@ tinyurl-service/
 │   └── src/main/java/com/tinyurl/gateway/
 │       ├── ApiGatewayApplication.java     # Main application class
 │       ├── config/
-│       │   ├── GatewayConfig.java         # Gateway configuration
 │       │   └── RateLimiterConfig.java      # Rate limiting config
 │       └── util/
 │           └── IpAddressExtractor.java    # IP extraction utility
@@ -1274,7 +1282,7 @@ Maven builds modules in this order:
 2. **create-service** - Depends on common
 3. **lookup-service** - Depends on common
 4. **api-gateway** - Independent module (no dependency on common)
-5. **stats-service** - Depends on common (for ClickEvent DTO)
+5. **stats-service** - Depends on common (for ClickEvent and UrlDeletedEvent DTOs)
 
 Both services include the `common` module JAR as a dependency. The API Gateway is independent and routes requests to the services. Stats Service uses Kafka for event-driven architecture.
 

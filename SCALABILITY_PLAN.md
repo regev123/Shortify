@@ -243,9 +243,10 @@ Stats Service:
 Kafka Setup:
   - Single Broker (Development) ✅
   - 3-Broker Cluster (Production) ✅
-  - Topic: url-click-events ✅
+  - Topics: url-click-events, url-deleted-events ✅
   - Batch Processing: 500 events per poll ✅
   - Concurrency: 3 consumer threads ✅
+  - Event-Driven URL Deletion: Kafka events for stats cleanup ✅
 
 Performance Optimizations:
   - Batch Inserts: 100 events per batch ✅
@@ -257,17 +258,25 @@ Performance Optimizations:
 
 **Event Flow:**
 ```
-Lookup Service → Kafka Producer → Kafka Topic → Stats Service Consumer
-     (Click)         (Async)      (Events)        (Batch Processing)
-                                                      ↓
-                                              Batch Processor
-                                              (100 events/batch)
-                                                      ↓
-                                              Stats Database
-                                              (Bulk Inserts)
-                                                      ↓
-                                              Aggregation Service
-                                              (Every 10 minutes)
+Click Events:
+Lookup Service → Kafka Producer → url-click-events Topic → Stats Service Consumer
+     (Click)         (Async)      (Events)                  (Batch Processing)
+                                                                    ↓
+                                                            Batch Processor
+                                                            (100 events/batch)
+                                                                    ↓
+                                                            Stats Database
+                                                            (Bulk Inserts)
+                                                                    ↓
+                                                            Aggregation Service
+                                                            (Every 10 minutes)
+
+URL Deletion Events:
+UrlCleanupService → Kafka Producer → url-deleted-events Topic → Stats Service Consumer
+   (Cleanup Job)        (Async)         (Events)                  (Real-time Cleanup)
+                                                                        ↓
+                                                                Delete Statistics
+                                                                (Immediate cleanup)
 ```
 
 **Kafka Capacity Analysis:**
@@ -314,13 +323,15 @@ KAFKA_NUM_PARTITIONS: 6
 
 **Implementation Status:**
 1. ✅ Stats Service module created
-2. ✅ Kafka producer in Lookup Service
-3. ✅ Kafka consumer in Stats Service
+2. ✅ Kafka producer in Lookup Service (click events + deletion events)
+3. ✅ Kafka consumer in Stats Service (batch processing for clicks, real-time for deletions)
 4. ✅ Batch processing for high throughput
 5. ✅ Deferred statistics aggregation
 6. ✅ Separate stats database instance
 7. ✅ Performance optimizations (100M requests/day)
 8. ✅ Kafka cluster setup (single broker + 3-broker cluster)
+9. ✅ Event-driven URL deletion cleanup (replaces cross-database queries)
+10. ✅ Clean logging (errors/warnings/debug only, no info-level noise)
 
 **Performance Results:**
 - **Before Optimization:** ~9 DB operations per click = 52,200 ops/sec at peak
@@ -394,8 +405,8 @@ See `stats-service/PERFORMANCE_OPTIMIZATIONS.md` for detailed documentation.
   - Single entry point for clients (Port 8080) ✅
   - Rate limiting infrastructure (Redis-based, currently disabled) ✅
   - CORS configuration ✅
-  - Centralized logging and monitoring ✅
-  - Health check endpoints (/health/create, /health/lookup) ✅
+  - Health check endpoints (/health/create, /health/lookup, /health/stats) ✅
+  - Clean logging (errors/warnings/debug only) ✅
   - Spring Boot Actuator integration ✅
 ```
 
@@ -463,10 +474,12 @@ See `stats-service/PERFORMANCE_OPTIMIZATIONS.md` for detailed documentation.
 - ✅ Rate limiting infrastructure (can be re-enabled)
 - ✅ Spring Boot Actuator health endpoints
 - ✅ Stats Service with Kafka integration
-- ✅ Event-driven architecture for click analytics
+- ✅ Event-driven architecture for click analytics and URL deletion cleanup
 - ✅ Batch processing for high throughput (100M requests/day)
 - ✅ Deferred statistics aggregation
 - ✅ Separate stats database instance
+- ✅ Event-driven URL deletion cleanup (Kafka-based, no cross-database queries)
+- ✅ Code cleanup (removed unused variables, removed log.info statements)
 
 ---
 

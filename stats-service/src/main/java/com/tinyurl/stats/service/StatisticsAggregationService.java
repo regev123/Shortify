@@ -45,15 +45,12 @@ public class StatisticsAggregationService {
      * - For 100M clicks/day, if we have 10M unique URLs, that's 10M aggregations per 10 minutes
      * - vs 900M DB operations per day with the old approach
      */
-    @Scheduled(fixedDelayString = "${stats.aggregation.update-interval-minutes:10}00000")
+    @Scheduled(fixedDelayString = "${stats.aggregation.update-interval-ms:600000}")
     public void aggregateStatistics() {
         if (!aggregationEnabled) {
             log.debug("Statistics aggregation is disabled");
             return;
         }
-        
-        log.info("Starting statistics aggregation...");
-        long startTime = System.currentTimeMillis();
         
         try {
             // Get all unique short codes that have click events
@@ -61,8 +58,6 @@ public class StatisticsAggregationService {
                     .stream()
                     .map(UrlClickEvent::getShortCode)
                     .collect(Collectors.toSet());
-            
-            log.info("Aggregating statistics for {} unique URLs", shortCodes.size());
             
             int processed = 0;
             for (String shortCode : shortCodes) {
@@ -78,9 +73,6 @@ public class StatisticsAggregationService {
                     log.error("Error aggregating statistics for shortCode: {}", shortCode, e);
                 }
             }
-            
-            long duration = System.currentTimeMillis() - startTime;
-            log.info("Completed statistics aggregation for {} URLs in {} ms", processed, duration);
             
         } catch (Exception e) {
             log.error("Error during statistics aggregation", e);
