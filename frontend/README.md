@@ -1,6 +1,6 @@
-# TinyURL Frontend
+# Shortify Frontend
 
-A modern React frontend for the TinyURL service, built with Vite and Tailwind CSS.
+A modern React frontend for the Shortify service, built with Vite and Tailwind CSS.
 
 ## Features
 

@@ -67,6 +67,35 @@ $broker3Status = docker ps --filter "name=kafka-broker-3" --format "{{.Status}}"
 
 $allBrokersRunning = $broker1Status -and $broker2Status -and $broker3Status
 
+# Wait for all brokers to be ready (check if they can accept connections)
+if ($allBrokersRunning) {
+    Write-Host "Waiting for all brokers to be ready..." -ForegroundColor Yellow
+    $maxWaitAttempts = 30
+    $waitAttempt = 0
+    $allBrokersReady = $false
+    
+    while ($waitAttempt -lt $maxWaitAttempts) {
+        $broker1Ready = docker exec kafka-broker-1 kafka-broker-api-versions --bootstrap-server localhost:9092 2>$null
+        $broker2Ready = docker exec kafka-broker-2 kafka-broker-api-versions --bootstrap-server localhost:9092 2>$null
+        $broker3Ready = docker exec kafka-broker-3 kafka-broker-api-versions --bootstrap-server localhost:9092 2>$null
+        
+        if ($LASTEXITCODE -eq 0 -or ($broker1Ready -and $broker2Ready -and $broker3Ready)) {
+            $allBrokersReady = $true
+            break
+        }
+        
+        $waitAttempt++
+        Write-Host "  Waiting for brokers... ($waitAttempt/$maxWaitAttempts)" -ForegroundColor Gray
+        Start-Sleep -Seconds 2
+    }
+    
+    if (-not $allBrokersReady) {
+        Write-Host "[WARNING] Some brokers may not be fully ready, but continuing..." -ForegroundColor Yellow
+    } else {
+        Write-Host "[OK] All brokers are ready!" -ForegroundColor Green
+    }
+}
+
 if ($allBrokersRunning) {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
@@ -74,50 +103,86 @@ if ($allBrokersRunning) {
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     
-    # Create the url-click-events topic
-    Write-Host "Creating Kafka topic: url-click-events..." -ForegroundColor Yellow
-    docker exec kafka-broker-1 kafka-topics --create `
-        --bootstrap-server localhost:9092 `
-        --topic url-click-events `
-        --partitions 6 `
-        --replication-factor 3 `
-        --if-not-exists | Out-Null
+    # Wait a bit more for cluster to stabilize
+    Write-Host "Waiting for cluster to stabilize..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 5
     
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] Topic 'url-click-events' is ready" -ForegroundColor Green
-    } else {
-        # Topic might already exist, check if it's accessible
-        docker exec kafka-broker-1 kafka-topics --describe `
+    # Create the url-click-events topic with retry
+    Write-Host "Creating Kafka topic: url-click-events..." -ForegroundColor Yellow
+    $topicCreated = $false
+    $topicRetries = 5
+    
+    for ($i = 1; $i -le $topicRetries; $i++) {
+        docker exec kafka-broker-1 kafka-topics --create `
             --bootstrap-server localhost:9092 `
-            --topic url-click-events | Out-Null
+            --topic url-click-events `
+            --partitions 6 `
+            --replication-factor 3 `
+            --if-not-exists 2>$null | Out-Null
+        
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[OK] Topic 'url-click-events' already exists" -ForegroundColor Green
+            $topicCreated = $true
+            Write-Host "[OK] Topic 'url-click-events' is ready" -ForegroundColor Green
+            break
         } else {
-            Write-Host "[WARNING] Could not verify topic. You may need to create it manually:" -ForegroundColor Yellow
-            Write-Host "  .\scripts\kafka\create-topic.ps1" -ForegroundColor White
+            # Check if topic already exists
+            docker exec kafka-broker-1 kafka-topics --describe `
+                --bootstrap-server localhost:9092 `
+                --topic url-click-events 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $topicCreated = $true
+                Write-Host "[OK] Topic 'url-click-events' already exists" -ForegroundColor Green
+                break
+            }
+            
+            if ($i -lt $topicRetries) {
+                Write-Host "  Retrying topic creation... ($i/$topicRetries)" -ForegroundColor Gray
+                Start-Sleep -Seconds 3
+            }
         }
     }
     
-    # Create the url-deleted-events topic
-    Write-Host "Creating Kafka topic: url-deleted-events..." -ForegroundColor Yellow
-    docker exec kafka-broker-1 kafka-topics --create `
-        --bootstrap-server localhost:9092 `
-        --topic url-deleted-events `
-        --partitions 6 `
-        --replication-factor 3 `
-        --if-not-exists | Out-Null
+    if (-not $topicCreated) {
+        Write-Host "[WARNING] Could not create/verify topic. You may need to create it manually:" -ForegroundColor Yellow
+        Write-Host "  .\scripts\kafka\create-topic.ps1" -ForegroundColor White
+    }
     
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] Topic 'url-deleted-events' is ready" -ForegroundColor Green
-    } else {
-        docker exec kafka-broker-1 kafka-topics --describe `
+    # Create the url-deleted-events topic with retry
+    Write-Host "Creating Kafka topic: url-deleted-events..." -ForegroundColor Yellow
+    $topicCreated = $false
+    
+    for ($i = 1; $i -le $topicRetries; $i++) {
+        docker exec kafka-broker-1 kafka-topics --create `
             --bootstrap-server localhost:9092 `
-            --topic url-deleted-events | Out-Null
+            --topic url-deleted-events `
+            --partitions 6 `
+            --replication-factor 3 `
+            --if-not-exists 2>$null | Out-Null
+        
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[OK] Topic 'url-deleted-events' already exists" -ForegroundColor Green
+            $topicCreated = $true
+            Write-Host "[OK] Topic 'url-deleted-events' is ready" -ForegroundColor Green
+            break
         } else {
-            Write-Host "[WARNING] Could not verify url-deleted-events topic" -ForegroundColor Yellow
+            # Check if topic already exists
+            docker exec kafka-broker-1 kafka-topics --describe `
+                --bootstrap-server localhost:9092 `
+                --topic url-deleted-events 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $topicCreated = $true
+                Write-Host "[OK] Topic 'url-deleted-events' already exists" -ForegroundColor Green
+                break
+            }
+            
+            if ($i -lt $topicRetries) {
+                Write-Host "  Retrying topic creation... ($i/$topicRetries)" -ForegroundColor Gray
+                Start-Sleep -Seconds 3
+            }
         }
+    }
+    
+    if (-not $topicCreated) {
+        Write-Host "[WARNING] Could not create/verify url-deleted-events topic" -ForegroundColor Yellow
     }
     
     Write-Host ""

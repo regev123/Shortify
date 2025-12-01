@@ -178,7 +178,7 @@ management:
 logging:
   level:
     root: INFO
-    com.tinyurl.gateway: INFO
+    com.shortify.gateway: INFO
     org.springframework.cloud.gateway: INFO
     org.springframework.web: INFO
     reactor.netty: INFO

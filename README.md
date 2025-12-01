@@ -1,6 +1,8 @@
-# TinyURL Service
+# Shortify Service
 
 A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, **Kafka event-driven architecture**, **Stats Service with analytics**, **React frontend with Tailwind CSS**, and scalable architecture following **SOLID principles** and clean code best practices.
+
+> **Note:** This project is inspired by [TinyURL](https://tinyurl.com/), the popular URL shortening service.
 
 <div align="center">
 
@@ -96,7 +98,7 @@ The application is built as a **Maven multi-module project** with four backend m
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Maven Parent POM                         │
-│              (tinyurl-services:1.0.0)                        │
+│              (shortify-services:1.0.0)                        │
 └──────────────┬──────────────────┬────────────────────────────┘
                │                  │
        ┌───────┴───────┐  ┌───────┴────────┐
@@ -204,7 +206,7 @@ The application is built as a **Maven multi-module project** with four backend m
 │                                                           │
 │  Stats Database (Separate Instance):                     │
 │  • Stats DB (Write/Read) - Port 5437                     │
-│  • Database: tinyurl_stats                               │
+│  • Database: shortify_stats                               │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -379,8 +381,8 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/tinyurl-service.git
-   cd tinyurl-service
+   git clone https://github.com/yourusername/shortify-service.git
+   cd shortify-service
    ```
 
 2. **Set up PostgreSQL with Read Replicas**
@@ -504,11 +506,11 @@ docker-compose -f docker-compose-postgresql.yml up -d
 ```
 
 This will set up:
-- **Primary Database** (Write): `localhost:5433` - Database: `tinyurl`
+- **Primary Database** (Write): `localhost:5433` - Database: `shortify`
 - **Read Replica 1**: `localhost:5434`
 - **Read Replica 2**: `localhost:5435`
 - **Read Replica 3**: `localhost:5436`
-- **Stats Database** (Separate): `localhost:5437` - Database: `tinyurl_stats`
+- **Stats Database** (Separate): `localhost:5437` - Database: `shortify_stats`
 
 ### Manual Setup
 
@@ -528,9 +530,9 @@ To populate the database with test data:
 
 ### Accessing PostgreSQL
 
-- **Primary**: `localhost:5433` (Database: `tinyurl`)
-- **Replicas**: `localhost:5434`, `5435`, `5436` (Database: `tinyurl`)
-- **Stats DB**: `localhost:5437` (Database: `tinyurl_stats`)
+- **Primary**: `localhost:5433` (Database: `shortify`)
+- **Replicas**: `localhost:5434`, `5435`, `5436` (Database: `shortify`)
+- **Stats DB**: `localhost:5437` (Database: `shortify_stats`)
 - **Username**: `postgres`
 - **Password**: `postgres`
 
@@ -968,7 +970,7 @@ spring:
 
   # PostgreSQL Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5433/tinyurl
+    url: jdbc:postgresql://localhost:5433/shortify
     driverClassName: org.postgresql.Driver
     username: postgres
     password: postgres
@@ -994,7 +996,7 @@ server:
 
 logging:
   level:
-    com.tinyurl: DEBUG
+    com.shortify: DEBUG
 ```
 
 **Lookup Service** (`lookup-service/src/main/resources/application.yml`):
@@ -1005,7 +1007,7 @@ spring:
 
   # PostgreSQL Database Configuration (same as create-service)
   datasource:
-    url: jdbc:postgresql://localhost:5433/tinyurl
+    url: jdbc:postgresql://localhost:5433/shortify
     driverClassName: org.postgresql.Driver
     username: postgres
     password: postgres
@@ -1042,7 +1044,7 @@ server:
 
 logging:
   level:
-    com.tinyurl: DEBUG
+    com.shortify: DEBUG
 ```
 
 **Stats Service** (`stats-service/src/main/resources/application.yml`):
@@ -1053,7 +1055,7 @@ spring:
 
   # PostgreSQL Database Configuration (Separate Instance)
   datasource:
-    url: jdbc:postgresql://localhost:5437/tinyurl_stats
+    url: jdbc:postgresql://localhost:5437/shortify_stats
     driverClassName: org.postgresql.Driver
     username: postgres
     password: postgres
@@ -1178,9 +1180,9 @@ management:
 
 ### Database Settings
 
-- **Primary**: Write operations only (Port 5433, Database: `tinyurl`)
-- **Replicas**: 3 read replicas (Ports 5434-5436, Database: `tinyurl`)
-- **Stats Database**: Separate instance (Port 5437, Database: `tinyurl_stats`)
+- **Primary**: Write operations only (Port 5433, Database: `shortify`)
+- **Replicas**: 3 read replicas (Ports 5434-5436, Database: `shortify`)
+- **Stats Database**: Separate instance (Port 5437, Database: `shortify_stats`)
 - **Health Checks**: Every 30 seconds
 - **Max Replication Lag**: 10MB
 - **Connection Pool**: HikariCP (20 max connections for URL services, 50 for Stats Service)
@@ -1246,13 +1248,13 @@ mvn test jacoco:report
 ## 📁 Project Structure
 
 ```
-tinyurl-service/
+shortify-service/
 ├── pom.xml                                 # Parent POM (Maven multi-module)
 ├── mvnw.cmd                               # Maven wrapper
 │
 ├── common/                                # Common Module (Shared Code)
 │   ├── pom.xml
-│   └── src/main/java/com/tinyurl/
+│   └── src/main/java/com/shortify/
 │       ├── entity/
 │       │   └── UrlMapping.java            # Shared JPA entity
 │       ├── constants/
@@ -1263,7 +1265,7 @@ tinyurl-service/
 │
 ├── create-service/                        # Create Service (Port 8081)
 │   ├── pom.xml
-│   └── src/main/java/com/tinyurl/create/
+│   └── src/main/java/com/shortify/create/
 │       ├── CreateServiceApplication.java  # Main application class
 │       ├── controller/
 │       │   └── CreateUrlController.java   # REST endpoints (URL creation + QR code generation)
@@ -1291,7 +1293,7 @@ tinyurl-service/
 │
 ├── lookup-service/                        # Lookup Service (Port 8082)
 │   ├── pom.xml
-│   └── src/main/java/com/tinyurl/lookup/
+│   └── src/main/java/com/shortify/lookup/
 │       ├── LookupServiceApplication.java  # Main application class
 │       ├── controller/
 │       │   └── LookupUrlController.java   # REST endpoints
@@ -1313,7 +1315,7 @@ tinyurl-service/
 │
 ├── api-gateway/                           # API Gateway (Port 8080)
 │   ├── pom.xml
-│   └── src/main/java/com/tinyurl/gateway/
+│   └── src/main/java/com/shortify/gateway/
 │       ├── ApiGatewayApplication.java     # Main application class
 │       ├── config/
 │       │   └── RateLimiterConfig.java      # Rate limiting config
@@ -1323,7 +1325,7 @@ tinyurl-service/
 ├── stats-service/                         # Stats Service (Port 8083)
 │   ├── pom.xml
 │   ├── PERFORMANCE_OPTIMIZATIONS.md       # Performance optimization docs
-│   └── src/main/java/com/tinyurl/stats/
+│   └── src/main/java/com/shortify/stats/
 │       ├── StatsServiceApplication.java   # Main application class
 │       ├── controller/
 │       │   └── StatsController.java       # REST endpoints + Kafka consumer

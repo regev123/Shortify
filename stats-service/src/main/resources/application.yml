@@ -5,9 +5,9 @@ spring:
   # PostgreSQL Database Configuration
   # Stats service uses a separate PostgreSQL instance (port 5437) for complete isolation
   # This allows independent scaling and prevents analytics queries from affecting URL operations
-  # Alternative: Use same instance (port 5433) with different database name (tinyurl_stats)
+  # Alternative: Use same instance (port 5433) with different database name (shortify_stats)
   datasource:
-    url: jdbc:postgresql://localhost:5437/tinyurl_stats
+    url: jdbc:postgresql://localhost:5437/shortify_stats
     driverClassName: org.postgresql.Driver
     username: postgres
     password: postgres
@@ -95,6 +95,6 @@ management:
 logging:
   level:
     root: INFO
-    com.tinyurl.stats: INFO
+    com.shortify.stats: INFO
     org.springframework.web: INFO
 

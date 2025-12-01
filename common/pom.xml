@@ -6,14 +6,14 @@
     <modelVersion>4.0.0</modelVersion>
     
     <parent>
-        <groupId>com.tinyurl</groupId>
-        <artifactId>tinyurl-services</artifactId>
+        <groupId>com.shortify</groupId>
+        <artifactId>shortify-services</artifactId>
         <version>1.0.0</version>
     </parent>
     
     <artifactId>common</artifactId>
     <name>Common Module</name>
-    <description>Shared code for TinyURL microservices (entities, DTOs, interfaces, exceptions, constants, utils)</description>
+    <description>Shared code for Shortify microservices (entities, constants,events)</description>
     
     <dependencies>
         <!-- Spring Boot Data JPA (for entities) -->

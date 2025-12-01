@@ -354,7 +354,7 @@ See `stats-service/PERFORMANCE_OPTIMIZATIONS.md` for detailed documentation.
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Maven Parent POM                     │
-│              (tinyurl-services:1.0.0)                   │
+│              (shortify-services:1.0.0)                   │
 └──────────────┬──────────────────┬──────────────────────┘
                │                  │
        ┌───────┴───────┐  ┌───────┴────────┐
@@ -396,7 +396,7 @@ See `stats-service/PERFORMANCE_OPTIMIZATIONS.md` for detailed documentation.
     ┌──────────────────────────────────┐
     │      Stats Database               │
     │  PostgreSQL (Separate Instance)  │
-    │  Port: 5437, DB: tinyurl_stats   │
+    │  Port: 5437, DB: shortify_stats   │
     └──────────────────────────────────┘
 ```
 
@@ -549,7 +549,7 @@ public class DatabaseConfig {
     public DataSource writeDataSource() {
         // Primary database for writes
         return DataSourceBuilder.create()
-            .url("jdbc:postgresql://primary-db:5432/tinyurl")
+            .url("jdbc:postgresql://primary-db:5432/shortify")
             .build();
     }
     
@@ -557,7 +557,7 @@ public class DatabaseConfig {
     public DataSource readDataSource() {
         // Read replica for reads
         return DataSourceBuilder.create()
-            .url("jdbc:postgresql://read-replica:5432/tinyurl")
+            .url("jdbc:postgresql://read-replica:5432/shortify")
             .build();
     }
 }
@@ -623,7 +623,7 @@ public class OptimizedCacheService {
 
 ```nginx
 # NGINX Configuration
-upstream tinyurl_backend {
+upstream shortify_backend {
     least_conn;  # Use least connections algorithm
     server api1:8080 max_fails=3 fail_timeout=30s;
     server api2:8080 max_fails=3 fail_timeout=30s;
@@ -635,7 +635,7 @@ server {
     listen 80;
     
     location / {
-        proxy_pass http://tinyurl_backend;
+        proxy_pass http://shortify_backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_connect_timeout 5s;
@@ -651,7 +651,7 @@ server {
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: tinyurl-lookup-service
+  name: shortify-lookup-service
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

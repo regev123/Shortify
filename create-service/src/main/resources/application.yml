@@ -5,7 +5,7 @@ spring:
   # PostgreSQL Database Configuration
   datasource:
     # Primary database (write operations)
-    url: jdbc:postgresql://localhost:5433/tinyurl
+    url: jdbc:postgresql://localhost:5433/shortify
     driverClassName: org.postgresql.Driver
     username: postgres
     password: postgres
@@ -63,6 +63,6 @@ management:
 logging:
   level:
     root: INFO
-    com.tinyurl: INFO
+    com.shortify: INFO
     org.hibernate: WARN
 

@@ -6,11 +6,11 @@
     <modelVersion>4.0.0</modelVersion>
     
     <!-- Parent POM for microservices -->
-    <groupId>com.tinyurl</groupId>
-    <artifactId>tinyurl-services</artifactId>
+    <groupId>com.shortify</groupId>
+    <artifactId>shortify-services</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-    <name>TinyURL Microservices</name>
+    <name>Shortify Microservices</name>
     <description>Microservices architecture for URL shortening service</description>
     
     <properties>
@@ -50,7 +50,7 @@
             </dependency>
             <!-- Common module -->
             <dependency>
-                <groupId>com.tinyurl</groupId>
+                <groupId>com.shortify</groupId>
                 <artifactId>common</artifactId>
                 <version>${project.version}</version>
             </dependency>

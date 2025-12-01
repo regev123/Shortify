@@ -86,7 +86,7 @@ function HomePage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-gray-900 mb-2">
-            TinyURL
+            Shortify
           </h1>
           <p className="text-gray-600 text-lg">
             Shorten your long URLs instantly
