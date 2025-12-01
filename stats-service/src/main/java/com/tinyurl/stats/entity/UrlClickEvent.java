@@ -36,16 +36,16 @@ public class UrlClickEvent {
     @Column(length = 100)
     private String city;
     
-    @Column(length = 50)
-    private String userAgent;
+    @Column(length = 500)
+    private String userAgent; // Browser user agents can be very long
     
     @Column(length = 50)
     private String deviceType; // MOBILE, DESKTOP, TABLET
     
-    @Column(length = 100)
-    private String referrer;
+    @Column(length = 1000)
+    private String referrer; // URLs can be very long
     
-    @Column(length = 50)
-    private String ipAddress;
+    @Column(length = 100)
+    private String ipAddress; // IPv6 addresses can be up to 45 chars, but allow extra space
 }
 

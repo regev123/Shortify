@@ -89,9 +89,10 @@ management:
 # Logging Configuration
 logging:
   level:
-    com.tinyurl: DEBUG
+    root: INFO
+    com.tinyurl: INFO
     org.hibernate: WARN
-    org.springframework.data.redis: DEBUG
+    org.springframework.data.redis: INFO
     org.apache.kafka: WARN  # Show Kafka warnings and errors
     org.springframework.kafka: INFO  # Show Kafka producer/consumer info
 

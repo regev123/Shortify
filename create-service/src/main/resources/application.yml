@@ -62,6 +62,7 @@ management:
 # Logging Configuration
 logging:
   level:
-    com.tinyurl: DEBUG
+    root: INFO
+    com.tinyurl: INFO
     org.hibernate: WARN
 

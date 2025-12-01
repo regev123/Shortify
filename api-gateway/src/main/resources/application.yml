@@ -177,7 +177,8 @@ management:
 
 logging:
   level:
-    com.tinyurl.gateway: DEBUG
-    org.springframework.cloud.gateway: DEBUG
+    root: INFO
+    com.tinyurl.gateway: INFO
+    org.springframework.cloud.gateway: INFO
     org.springframework.web: INFO
     reactor.netty: INFO

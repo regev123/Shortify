@@ -94,6 +94,7 @@ management:
 
 logging:
   level:
-    com.tinyurl.stats: DEBUG
+    root: INFO
+    com.tinyurl.stats: INFO
     org.springframework.web: INFO
 

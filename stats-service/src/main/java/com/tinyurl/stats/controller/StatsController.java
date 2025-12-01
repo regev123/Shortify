@@ -97,7 +97,7 @@ public class StatsController {
     }
     
     @GetMapping("/url/{shortCode}")
-    public ResponseEntity<UrlStatisticsResponse> getUrlStatistics(@PathVariable String shortCode) {
+    public ResponseEntity<UrlStatisticsResponse> getUrlStatistics(@PathVariable("shortCode") String shortCode) {
         log.debug("Getting statistics for shortCode: {}", shortCode);
         UrlStatisticsResponse response = statsService.getUrlStatistics(shortCode);
         return ResponseEntity.ok(response);

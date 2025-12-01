@@ -1,6 +1,6 @@
 # TinyURL Service
 
-A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, **Kafka event-driven architecture**, **Stats Service with analytics**, and scalable architecture following **SOLID principles** and clean code best practices.
+A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, **Kafka event-driven architecture**, **Stats Service with analytics**, **React frontend with Tailwind CSS**, and scalable architecture following **SOLID principles** and clean code best practices.
 
 <div align="center">
 
@@ -65,7 +65,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **RESTful API** - Clean, intuitive endpoints
 - ✅ **Clean Architecture** - Separation of concerns, single responsibility
 - ✅ **Transaction Management** - ACID-compliant database operations with read/write splitting
-- ✅ **Focused Logging** - Error, warning, and debug logging only (no info-level noise)
+- ✅ **INFO Level Logging** - Comprehensive logging at INFO level across all services
 - ✅ **Interface Segregation** - Service interfaces for extensibility
 - ✅ **Dependency Inversion** - Abstractions, not concrete implementations
 - ✅ **Resource Management** - Proper cleanup with @PreDestroy hooks
@@ -81,6 +81,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 | **Database**   | PostgreSQL            | 15+       |
 | **Cache**      | Redis                 | 7+        |
 | **Message Broker** | Apache Kafka      | 7.5.0     |
+| **Frontend**   | React + Tailwind CSS | 19.2.0   |
 | **Connection Pool** | HikariCP         | -         |
 | **Build Tool** | Maven                 | 3.6+      |
 | **Lombok**     | Code Generation       | -         |
@@ -89,7 +90,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 
 ### Microservices Architecture
 
-The application is built as a **Maven multi-module project** with four modules:
+The application is built as a **Maven multi-module project** with four backend modules plus a **React frontend**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -474,7 +475,15 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    Create Service: http://localhost:8081/actuator/health
    Lookup Service: http://localhost:8082/actuator/health
    Stats Service: http://localhost:8083/actuator/health
+   
+   # Frontend
+   Frontend UI: http://localhost:5173
    ```
+
+9. **Access the Web Interface**
+   - Open `http://localhost:5173` in your browser
+   - **Home Page**: Shorten long URLs
+   - **Analytics Page**: View URL statistics and platform-wide analytics
 
 ## 🗄 Database Setup
 
@@ -525,6 +534,52 @@ To populate the database with test data:
 - **Password**: `postgres`
 
 Use pgAdmin or any PostgreSQL client to connect.
+
+## 🎨 Frontend Application
+
+### React Frontend with Tailwind CSS
+
+The project includes a modern React frontend built with Vite and Tailwind CSS.
+
+**Features:**
+- ✅ **Home Page** - URL shortening interface
+- ✅ **Analytics Page** - Statistics dashboard with:
+  - URL-specific statistics (clicks, top countries, timeline)
+  - Platform-wide statistics (total URLs, total clicks, clicks today)
+- ✅ **React Router** - Navigation between pages
+- ✅ **Responsive Design** - Works on desktop and mobile
+- ✅ **Tailwind CSS** - Modern, beautiful UI
+
+**Setup:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+**Pages:**
+- `/` - Home page (URL shortening)
+- `/analytics` - Analytics dashboard
+
+### Screenshots
+
+#### Home Page - URL Shortening
+
+**Creating a Short URL:**
+![Long To Short URL Creation](Long%20To%20Short%20URL%20Creation.png)
+
+**Short URL Result:**
+![Short Url From Long URL](Short%20Url%20From%20Long%20URL.png)
+
+#### Analytics Dashboard
+
+**URL Statistics:**
+![URL Statistics](URL%20Statistics.png)
+
+**Platform Statistics:**
+![Platform Statistics](Platform%20Statistics.png)
 
 ## 📚 API Documentation
 
@@ -1139,6 +1194,9 @@ mvn test jacoco:report
 - [x] Batch processing for high throughput ✅
 - [x] Performance optimizations (100M requests/day) ✅
 - [x] Code cleanup (removed unused variables, removed log.info statements) ✅
+- [x] React frontend with Tailwind CSS ✅
+- [x] Analytics dashboard UI ✅
+- [x] INFO level logging across all services ✅
 - [ ] Add HTTPS support
 - [ ] Implement custom short URL support
 
@@ -1148,7 +1206,7 @@ mvn test jacoco:report
 - [x] Analytics service with click tracking ✅
 - [x] Geographic analytics (country/city) ✅
 - [x] Platform-wide statistics ✅
-- [ ] Analytics dashboard (UI)
+- [x] Analytics dashboard (React UI) ✅
 - [ ] QR code generation
 - [ ] Bulk URL shortening
 - [ ] API authentication (JWT)
@@ -1261,6 +1319,19 @@ tinyurl-service/
 │       │   └── PlatformStatisticsResponse.java
 │       └── config/
 │           └── KafkaConfig.java           # Kafka consumer config
+│
+├── frontend/                              # React Frontend Application
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── HomePage.jsx              # URL shortening page
+│   │   │   └── AnalyticsPage.jsx         # Analytics dashboard
+│   │   ├── components/
+│   │   │   └── Layout.jsx                # Navigation layout
+│   │   ├── App.jsx                       # Main app with routing
+│   │   └── index.css                     # Tailwind CSS imports
+│   ├── package.json
+│   ├── tailwind.config.js                # Tailwind configuration
+│   └── vite.config.js                    # Vite configuration
 │
 └── scripts/
     ├── Database/
