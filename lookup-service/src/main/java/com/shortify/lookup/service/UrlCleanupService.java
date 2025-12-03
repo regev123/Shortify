@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +52,11 @@ public class UrlCleanupService {
      * 1. Haven't been accessed in the configured retention period (6 months by default)
      * 2. Have expired (expiresAt < now)
      * 
+     * Optimized with partition pruning:
+     * - Only checks partitions older than retention period (6+ months) for unused URLs
+     * - This dramatically reduces the number of partitions scanned, improving performance
+     * - For expired URLs, checks all partitions (but PostgreSQL still uses partition pruning)
+     * 
      * Cron expression: "0 0 2 * * ?" = Every day at 2:00 AM
      * 
      * Note: Each batch deletion runs in its own transaction to avoid long-running transactions
@@ -64,13 +70,20 @@ public class UrlCleanupService {
         
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime accessCutoffDate = now.minusMonths(retentionMonths);
+        // Partition cutoff: Only check partitions older than retention period
+        // This enables partition pruning - PostgreSQL will skip recent partitions
+        LocalDate partitionCutoffDate = now.toLocalDate().minusMonths(retentionMonths);
+        
+        log.info("Starting URL cleanup job - checking partitions older than {}", partitionCutoffDate);
         
         try {
             // Delete in batches, each batch in its own transaction
             // This prevents long-running transactions and connection pool exhaustion
             boolean hasMore = true;
+            int totalDeleted = 0;
             while (hasMore) {
-                List<String> deletedShortCodes = deleteBatch(accessCutoffDate, now);
+                List<String> deletedShortCodes = deleteBatch(accessCutoffDate, now, partitionCutoffDate);
+                totalDeleted += deletedShortCodes.size();
                 
                 // Publish deletion events to Kafka for stats service cleanup
                 publishDeletionEvents(deletedShortCodes, now);
@@ -83,6 +96,8 @@ public class UrlCleanupService {
                     Thread.sleep(100);
                 }
             }
+            
+            log.info("URL cleanup job completed - deleted {} URLs", totalDeleted);
             
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -98,15 +113,19 @@ public class UrlCleanupService {
      * Deletes a single batch of URLs in its own transaction
      * Uses REQUIRES_NEW propagation to ensure each batch is independent
      * 
+     * Optimized with partition pruning - only checks partitions older than partitionCutoffDate
+     * for unused URLs, dramatically reducing the number of partitions scanned.
+     * 
      * @param accessCutoffDate cutoff date for access-based deletion
      * @param currentTime current time for expiration check
+     * @param partitionCutoffDate only check partitions older than this date (enables partition pruning)
      * @return list of shortCodes that were deleted
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private List<String> deleteBatch(LocalDateTime accessCutoffDate, LocalDateTime currentTime) {
+    private List<String> deleteBatch(LocalDateTime accessCutoffDate, LocalDateTime currentTime, LocalDate partitionCutoffDate) {
         // First, get the URLs that will be deleted (to get their shortCodes)
         List<UrlMapping> urlsToDelete = urlMappingRepository.findUnusedOrExpiredUrls(
-                accessCutoffDate, currentTime, batchSize);
+                accessCutoffDate, currentTime, partitionCutoffDate, batchSize);
         
         // Extract shortCodes before deletion
         List<String> shortCodes = urlsToDelete.stream()
@@ -115,7 +134,7 @@ public class UrlCleanupService {
         
         // Delete the URLs
         if (!shortCodes.isEmpty()) {
-            urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, currentTime, batchSize);
+            urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, currentTime, partitionCutoffDate, batchSize);
         }
         
         return shortCodes;
@@ -167,13 +186,16 @@ public class UrlCleanupService {
     /**
      * Manual cleanup method for testing or ad-hoc execution
      * 
+     * Optimized with partition pruning - only checks partitions older than retention period
+     * 
      * @return number of URLs deleted
      */
     @Transactional
     public long cleanupUnusedUrlsManually() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime accessCutoffDate = now.minusMonths(retentionMonths);
-        return urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, now, Integer.MAX_VALUE);
+        LocalDate partitionCutoffDate = now.toLocalDate().minusMonths(retentionMonths);
+        return urlMappingRepository.deleteUnusedOrExpiredUrls(accessCutoffDate, now, partitionCutoffDate, Integer.MAX_VALUE);
     }
 }
 
