@@ -59,6 +59,16 @@ management:
     diskspace:
       enabled: true
 
+# Snowflake ID Generator Configuration
+# Used for distributed unique ID generation
+# Worker ID: Unique per service instance (0-31)
+# Datacenter ID: Unique per datacenter/region (0-31)
+# For single instance: worker-id=1, datacenter-id=1
+# For multiple instances: Use different worker-id values (1, 2, 3, etc.)
+snowflake:
+  worker-id: 1        # Unique per Create Service instance (0-31)
+  datacenter-id: 1   # Unique per datacenter/region (0-31)
+
 # Logging Configuration
 logging:
   level:

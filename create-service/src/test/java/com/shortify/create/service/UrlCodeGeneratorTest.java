@@ -8,14 +8,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.shortify.create.exception.UrlGenerationException;
-import com.shortify.create.repository.CreateUrlRepository;
 import com.shortify.create.service.UrlCodeGenerator;
 
-import static com.shortify.create.constants.CreateUrlConstants.MAX_CODE_GENERATION_ATTEMPTS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,7 +18,7 @@ import static org.mockito.Mockito.*;
 class UrlCodeGeneratorTest {
 
     @Mock
-    private CreateUrlRepository urlMappingRepository;
+    private SnowflakeIdGenerator snowflakeIdGenerator;
 
     @InjectMocks
     private UrlCodeGenerator urlCodeGenerator;
@@ -34,11 +29,11 @@ class UrlCodeGeneratorTest {
     }
 
     @Test
-    @DisplayName("generateUniqueCode - Success on first attempt")
-    void generateUniqueCode_FirstAttemptSuccess_ReturnsCode() {
+    @DisplayName("generateUniqueCode - Successfully generates code from Snowflake ID")
+    void generateUniqueCode_SnowflakeId_ReturnsBase62EncodedCode() {
         // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(false);
+        long snowflakeId = 1234567890123456789L;
+        when(snowflakeIdGenerator.generateId()).thenReturn(snowflakeId);
 
         // When
         String result = urlCodeGenerator.generateUniqueCode();
@@ -46,144 +41,125 @@ class UrlCodeGeneratorTest {
         // Then
         assertThat(result).isNotNull();
         assertThat(result).isNotEmpty();
-        verify(urlMappingRepository, atLeastOnce()).existsByShortUrl(anyString());
+        verify(snowflakeIdGenerator, times(1)).generateId();
     }
 
     @Test
-    @DisplayName("generateUniqueCode - Success after collision")
-    void generateUniqueCode_AfterCollision_RetriesAndSucceeds() {
-        // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(true)  // First attempt: collision
-                .thenReturn(false); // Second attempt: success
-
-        // When
-        String result = urlCodeGenerator.generateUniqueCode();
-
-        // Then
-        assertThat(result).isNotNull();
-        assertThat(result).isNotEmpty();
-        verify(urlMappingRepository, times(2)).existsByShortUrl(anyString());
-    }
-
-    @Test
-    @DisplayName("generateUniqueCode - Multiple collisions then success")
-    void generateUniqueCode_MultipleCollisions_RetriesUntilSuccess() {
-        // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(true)   // Attempt 1: collision
-                .thenReturn(true)   // Attempt 2: collision
-                .thenReturn(true)   // Attempt 3: collision
-                .thenReturn(false); // Attempt 4: success
-
-        // When
-        String result = urlCodeGenerator.generateUniqueCode();
-
-        // Then
-        assertThat(result).isNotNull();
-        assertThat(result).isNotEmpty();
-        verify(urlMappingRepository, times(4)).existsByShortUrl(anyString());
-    }
-
-    @Test
-    @DisplayName("generateUniqueCode - Max attempts exceeded throws exception")
-    void generateUniqueCode_MaxAttemptsExceeded_ThrowsException() {
-        // Given - all attempts result in collision
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(true);
-
-        // When & Then
-        assertThatThrownBy(() -> urlCodeGenerator.generateUniqueCode())
-                .isInstanceOf(UrlGenerationException.class)
-                .hasMessageContaining("Unable to generate unique short URL code");
-
-        // The implementation checks attempts before the while condition,
-        // so it throws after 99 checks (on the 100th attempt, before checking existsByShortUrl)
-        verify(urlMappingRepository, times(MAX_CODE_GENERATION_ATTEMPTS - 1))
-                .existsByShortUrl(anyString());
-    }
-
-    @Test
-    @DisplayName("generateUniqueCode - Generated code is alphanumeric")
+    @DisplayName("generateUniqueCode - Generated code is alphanumeric (Base62)")
     void generateUniqueCode_GeneratedCode_IsAlphanumeric() {
         // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(false);
+        long snowflakeId = 1000000L;
+        when(snowflakeIdGenerator.generateId()).thenReturn(snowflakeId);
 
         // When
         String result = urlCodeGenerator.generateUniqueCode();
 
         // Then
         assertThat(result).matches("^[a-zA-Z0-9]+$");
+        verify(snowflakeIdGenerator, times(1)).generateId();
     }
 
     @Test
-    @DisplayName("generateUniqueCode - Generated codes are different")
+    @DisplayName("generateUniqueCode - Generated codes are different for different IDs")
     void generateUniqueCode_MultipleCalls_GeneratesDifferentCodes() {
         // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(false);
+        long id1 = 1000000L;
+        long id2 = 2000000L;
+        when(snowflakeIdGenerator.generateId())
+                .thenReturn(id1)
+                .thenReturn(id2);
 
         // When
         String code1 = urlCodeGenerator.generateUniqueCode();
         String code2 = urlCodeGenerator.generateUniqueCode();
 
         // Then
-        // Note: There's a small chance they could be the same due to randomness
-        // But statistically very unlikely, so we just verify both are valid
         assertThat(code1).isNotNull().isNotEmpty();
         assertThat(code2).isNotNull().isNotEmpty();
+        assertThat(code1).isNotEqualTo(code2); // Different IDs should produce different codes
         assertThat(code1).matches("^[a-zA-Z0-9]+$");
         assertThat(code2).matches("^[a-zA-Z0-9]+$");
+        verify(snowflakeIdGenerator, times(2)).generateId();
     }
 
     @Test
     @DisplayName("generateUniqueCode - Generated code length is reasonable")
     void generateUniqueCode_GeneratedCode_HasReasonableLength() {
         // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(false);
+        long snowflakeId = 56800235583L; // Max 6-character Base62 value
+        when(snowflakeIdGenerator.generateId()).thenReturn(snowflakeId);
 
         // When
         String result = urlCodeGenerator.generateUniqueCode();
 
         // Then
         assertThat(result.length()).isGreaterThan(0);
-        assertThat(result.length()).isLessThanOrEqualTo(10); // MAX_SHORT_CODE_LENGTH
+        assertThat(result.length()).isLessThanOrEqualTo(11); // Max Base62 length for 64-bit long
+        verify(snowflakeIdGenerator, times(1)).generateId();
     }
 
     @Test
-    @DisplayName("generateUniqueCode - Handles repository exception")
-    void generateUniqueCode_RepositoryException_PropagatesException() {
+    @DisplayName("generateUniqueCode - Handles small Snowflake IDs (short codes)")
+    void generateUniqueCode_SmallId_GeneratesShortCode() {
         // Given
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenThrow(new RuntimeException("Database connection failed"));
-
-        // When & Then
-        assertThatThrownBy(() -> urlCodeGenerator.generateUniqueCode())
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Database connection failed");
-    }
-
-    @Test
-    @DisplayName("generateUniqueCode - Success after many collisions")
-    void generateUniqueCode_ManyCollisionsThenSuccess_EventuallySucceeds() {
-        // Given - simulate many collisions then success
-        when(urlMappingRepository.existsByShortUrl(anyString()))
-                .thenReturn(true)   // Many collisions
-                .thenReturn(true)
-                .thenReturn(true)
-                .thenReturn(true)
-                .thenReturn(true)
-                .thenReturn(false); // Finally success
+        long smallId = 1000L;
+        when(snowflakeIdGenerator.generateId()).thenReturn(smallId);
 
         // When
         String result = urlCodeGenerator.generateUniqueCode();
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(result).isNotEmpty();
-        verify(urlMappingRepository, times(6)).existsByShortUrl(anyString());
+        assertThat(result.length()).isLessThanOrEqualTo(6); // Small IDs produce shorter codes
+        verify(snowflakeIdGenerator, times(1)).generateId();
+    }
+
+    @Test
+    @DisplayName("generateUniqueCode - Handles large Snowflake IDs (longer codes)")
+    void generateUniqueCode_LargeId_GeneratesLongerCode() {
+        // Given
+        long largeId = 9000000000000000000L; // Very large ID
+        when(snowflakeIdGenerator.generateId()).thenReturn(largeId);
+
+        // When
+        String result = urlCodeGenerator.generateUniqueCode();
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.length()).isGreaterThan(6); // Large IDs produce longer codes
+        assertThat(result.length()).isLessThanOrEqualTo(11); // Max Base62 length
+        verify(snowflakeIdGenerator, times(1)).generateId();
+    }
+
+    @Test
+    @DisplayName("generateUniqueCode - No database collision check needed")
+    void generateUniqueCode_NoCollisionCheck_NoRepositoryCall() {
+        // Given
+        long snowflakeId = 123456789L;
+        when(snowflakeIdGenerator.generateId()).thenReturn(snowflakeId);
+
+        // When
+        String result = urlCodeGenerator.generateUniqueCode();
+
+        // Then
+        assertThat(result).isNotNull();
+        // Verify Snowflake is called, but no repository collision check
+        verify(snowflakeIdGenerator, times(1)).generateId();
+        // No repository mock needed - collision detection removed
+    }
+
+    @Test
+    @DisplayName("generateUniqueCode - Handles zero ID correctly")
+    void generateUniqueCode_ZeroId_GeneratesValidCode() {
+        // Given
+        long zeroId = 0L;
+        when(snowflakeIdGenerator.generateId()).thenReturn(zeroId);
+
+        // When
+        String result = urlCodeGenerator.generateUniqueCode();
+
+        // Then
+        assertThat(result).isEqualTo("0"); // Base62 encode of 0 is "0"
+        verify(snowflakeIdGenerator, times(1)).generateId();
     }
 }
-
