@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.shortify.create.dto.CreateUrlRequest;
 import com.shortify.create.dto.CreateUrlResult;
 import com.shortify.create.service.CreateUrlService;
+import com.shortify.create.service.PartitionManagementService;
 import com.shortify.create.service.QrCodeService;
 import com.shortify.create.service.RequestContextExtractor;
 
@@ -36,6 +37,7 @@ public class CreateUrlController {
     private final CreateUrlService createUrlService;
     private final RequestContextExtractor requestContextExtractor;
     private final QrCodeService qrCodeService;
+    private final PartitionManagementService partitionManagementService;
     
     /**
      * Creates a short URL for the given original URL
@@ -95,6 +97,60 @@ public class CreateUrlController {
         } catch (Exception e) {
             log.error("Error generating QR code for URL: {}", shortUrl, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * Manually triggers partition creation for the next month
+     * Useful for testing and development environments
+     * 
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/admin/partitions/create-next")
+    public ResponseEntity<String> createNextPartition() {
+        try {
+            partitionManagementService.createNextMonthPartitionManually();
+            return ResponseEntity.ok("Next month partition created successfully");
+        } catch (Exception e) {
+            log.error("Error creating partition", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating partition: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Creates partitions for the next N months
+     * Useful for testing and initial setup
+     * 
+     * @param months number of months to create partitions for
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/admin/partitions/create-next-months")
+    public ResponseEntity<String> createNextPartitions(@RequestParam(defaultValue = "12") int months) {
+        try {
+            partitionManagementService.createPartitionsForNextMonths(months);
+            return ResponseEntity.ok(String.format("Created partitions for next %d months successfully", months));
+        } catch (Exception e) {
+            log.error("Error creating partitions", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating partitions: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets partition statistics
+     * 
+     * @return ResponseEntity with partition statistics
+     */
+    @GetMapping("/admin/partitions/stats")
+    public ResponseEntity<String> getPartitionStats() {
+        try {
+            String stats = partitionManagementService.getPartitionStatistics();
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Error getting partition statistics", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting partition statistics: " + e.getMessage());
         }
     }
     

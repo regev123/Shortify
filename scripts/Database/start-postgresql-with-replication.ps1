@@ -11,7 +11,7 @@ Write-Host "[1/7] Cleaning up old containers and volumes (if any)..." -Foregroun
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Stop and remove containers with volumes (this will delete all data)
-docker-compose -f "$scriptDir\docker-compose-postgresql.yml" down -v 2>$null | Out-Null
+docker-compose -f "$scriptDir\docker-compose-postgresql.yml" down -v 2>&1 | Out-Null
 
 # Remove any orphaned containers with the same names
 docker rm -f shortify-postgres-primary shortify-postgres-replica1 shortify-postgres-replica2 shortify-postgres-replica3 shortify-postgres-stats 2>$null | Out-Null
@@ -23,10 +23,12 @@ Write-Host "  Cleanup complete! All previous data has been removed.`n" -Foregrou
 
 # Step 2: Start Docker Compose
 Write-Host "[2/7] Starting Docker Compose containers..." -ForegroundColor Yellow
-docker-compose -f "$scriptDir\docker-compose-postgresql.yml" up -d
+$output = docker-compose -f "$scriptDir\docker-compose-postgresql.yml" up -d 2>&1
+$exitCode = $LASTEXITCODE
 
-if ($LASTEXITCODE -ne 0) {
+if ($exitCode -ne 0) {
     Write-Host "ERROR: Failed to start containers!" -ForegroundColor Red
+    Write-Host $output -ForegroundColor Red
     exit 1
 }
 
@@ -95,7 +97,7 @@ docker exec shortify-postgres-replica3 bash -c "rm -rf /var/lib/postgresql/data/
 # Restart replicas
 Write-Host "  Restarting replicas..." -ForegroundColor Gray
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-docker-compose -f "$scriptDir\docker-compose-postgresql.yml" restart postgres-replica1 postgres-replica2 postgres-replica3 2>$null | Out-Null
+docker-compose -f "$scriptDir\docker-compose-postgresql.yml" restart postgres-replica1 postgres-replica2 postgres-replica3 2>&1 | Out-Null
 
 # Wait for replicas to initialize
 Write-Host "  Waiting for replicas to take base backup and start replication (60 seconds)..." -ForegroundColor Gray

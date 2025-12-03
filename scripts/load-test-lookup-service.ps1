@@ -1,12 +1,20 @@
 # Load Test Script for Lookup Service (via API Gateway)
 # Reads all URLs from the lookup service through the API Gateway 5 times
 # Run: .\load-test-lookup-service.ps1
+#
+# Performance Optimizations:
+# - Increased default concurrency from 20 to 100 parallel requests
+# - Reduced timeout from 10s to 5s for faster failure detection
+# - Enabled KeepAlive for HTTP connection reuse
+# - Reduced sleep time from 10ms to 1ms in result collection loop
+# - Less frequent progress updates (every 10% instead of 5%)
+# - Pre-processed URL list (trimmed once instead of per iteration)
 
 param(
     [int]$Iterations = 5,
     [string]$ApiGatewayUrl = "http://localhost:8080",
     [string]$ShortUrlsFile = "short-urls.txt",
-    [int]$Concurrency = 20  # Number of parallel requests
+    [int]$Concurrency = 100  # Number of parallel requests (increased from 20 for better performance)
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -44,7 +52,8 @@ if (-not (Test-Path $ShortUrlsFile)) {
     exit 1
 }
 
-$shortUrls = Get-Content -Path $ShortUrlsFile -ErrorAction Stop | Where-Object { $_.Trim() -ne "" }
+# Load and pre-process URLs once (more efficient)
+$shortUrls = Get-Content -Path $ShortUrlsFile -ErrorAction Stop | Where-Object { $_.Trim() -ne "" } | ForEach-Object { $_.Trim() }
 $urlCount = $shortUrls.Count
 
 if ($urlCount -eq 0) {
@@ -71,19 +80,16 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
     $iterationNotFound = 0
     $iterationErrors = 0
     
-    # Progress tracking
-    $progressInterval = [math]::Max(1, [math]::Floor($urlCount / 20))
+    # Progress tracking (less frequent updates = less overhead)
+    $progressInterval = [math]::Max(1, [math]::Floor($urlCount / 10))  # Update every 10% instead of 5%
     
-    # Prepare URLs for parallel processing
+    # Pre-process URLs once (already trimmed, just create objects)
     $urlsToProcess = 0..($urlCount - 1) | ForEach-Object { 
-        $code = $shortUrls[$_].Trim()
-        if (-not [string]::IsNullOrWhiteSpace($code)) {
-            @{
-                Index = $_
-                ShortCode = $code
-            }
+        @{
+            Index = $_
+            ShortCode = $shortUrls[$_]
         }
-    } | Where-Object { $null -ne $_ }
+    }
     
     # Use RunspacePool for efficient parallel processing (PowerShell 5.1 compatible)
     $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $Concurrency)
@@ -96,7 +102,7 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         $powershell = [PowerShell]::Create()
         $powershell.RunspacePool = $runspacePool
         
-        # Create scriptblock
+        # Create optimized scriptblock using HttpWebRequest (optimized for redirect checking)
         $scriptBlock = {
             param($shortCode, $apiGatewayUrl)
             
@@ -110,11 +116,13 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
             }
             
             try {
-                # Send GET request via API Gateway with redirect handling
+                # Optimized HttpWebRequest (faster than Invoke-WebRequest for redirect checking)
                 $request = [System.Net.HttpWebRequest]::Create("$apiGatewayUrl/$shortCode")
                 $request.Method = "GET"
-                $request.Timeout = 10000
+                $request.Timeout = 5000  # Reduced from 10000ms to 5000ms
+                $request.ReadWriteTimeout = 5000
                 $request.AllowAutoRedirect = $false
+                $request.KeepAlive = $true  # Enable connection reuse
                 
                 try {
                     $response = $request.GetResponse()
@@ -213,10 +221,12 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
                 $totalLookups++
                 $processedCount++
                 
-                # Progress update
-                if ($processedCount % $progressInterval -eq 0) {
+                # Progress update (less frequent to reduce overhead)
+                if ($processedCount % $progressInterval -eq 0 -or $processedCount -eq $urlCount) {
                     $percentComplete = [math]::Round(($processedCount / $urlCount) * 100, 1)
-                    Write-Host "    Progress: $percentComplete% ($processedCount/$urlCount) | Success: $iterationSuccess | Not Found: $iterationNotFound | Errors: $iterationErrors" -ForegroundColor Gray
+                    $elapsed = (Get-Date) - $iterationStartTime
+                    $rate = $processedCount / $elapsed.TotalSeconds
+                    Write-Host "    Progress: $percentComplete% ($processedCount/$urlCount) | Success: $iterationSuccess | Not Found: $iterationNotFound | Errors: $iterationErrors | Rate: $([math]::Round($rate, 1)) req/s" -ForegroundColor Gray
                 }
             } catch {
                 [System.Threading.Monitor]::Enter($lockObject)
@@ -236,7 +246,7 @@ for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         }
         
         if ($runspaces.Count -gt 0) {
-            Start-Sleep -Milliseconds 10
+            Start-Sleep -Milliseconds 1  # Reduced from 10ms to 1ms for faster processing
         }
     }
     

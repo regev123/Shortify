@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import static com.shortify.create.constants.CreateUrlConstants.DEFAULT_EXPIRATION_YEARS;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -39,14 +40,17 @@ public final class UrlMappingFactory {
         }
         
         LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
         
         UrlMapping mapping = new UrlMapping();
         mapping.setOriginalUrl(originalUrl);
         mapping.setShortUrl(shortCode);
         mapping.setCreatedAt(now);
+        mapping.setCreatedDate(today);  // Set partition key explicitly
         mapping.setExpiresAt(now.plusYears(DEFAULT_EXPIRATION_YEARS));
         mapping.setAccessCount(DEFAULT_ACCESS_COUNT);
         mapping.setLastAccessedAt(null); // Will be set on first access
+        mapping.setShardId(0);  // Default shard ID (single shard for now)
         
         return mapping;
     }

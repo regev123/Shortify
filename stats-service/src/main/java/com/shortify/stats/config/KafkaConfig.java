@@ -1,13 +1,16 @@
 package com.shortify.stats.config;
 
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
@@ -22,6 +25,47 @@ public class KafkaConfig {
     
     @Value("${spring.kafka.consumer.group-id:stats-service-group}")
     private String groupId;
+    
+    @Value("${kafka.topic.click-events:url-click-events}")
+    private String clickEventsTopic;
+    
+    @Value("${kafka.topic.url-deleted:url-deleted-events}")
+    private String urlDeletedTopic;
+    
+    /**
+     * KafkaAdmin bean enables automatic topic creation
+     * Topics will be created when the application starts if they don't exist
+     */
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        return new KafkaAdmin(configs);
+    }
+    
+    /**
+     * Auto-create url-click-events topic with production-ready configuration
+     * 6 partitions for parallel processing, replication factor 3 for high availability
+     */
+    @Bean
+    public org.apache.kafka.clients.admin.NewTopic clickEventsTopic() {
+        return TopicBuilder.name(clickEventsTopic)
+                .partitions(6)
+                .replicas(3)
+                .build();
+    }
+    
+    /**
+     * Auto-create url-deleted-events topic with production-ready configuration
+     * 6 partitions for parallel processing, replication factor 3 for high availability
+     */
+    @Bean
+    public org.apache.kafka.clients.admin.NewTopic urlDeletedTopic() {
+        return TopicBuilder.name(urlDeletedTopic)
+                .partitions(6)
+                .replicas(3)
+                .build();
+    }
     
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {

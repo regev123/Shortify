@@ -22,10 +22,19 @@ spring:
       max-lifetime: 1800000
       pool-name: CreateServiceHikariPool
 
+  # SQL Initialization
+  # Run schema.sql on every startup to ensure partitioned table exists
+  sql:
+    init:
+      mode: always
+      continue-on-error: true  # Continue even if schema.sql has errors (e.g., table already exists)
+
   # JPA Configuration
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
+      # Let JPA create table from entity first
+      # DatabasePartitionInitializer will convert it to partitioned if needed
       ddl-auto: update
     show-sql: false
     properties:
