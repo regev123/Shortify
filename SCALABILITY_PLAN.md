@@ -674,6 +674,8 @@ CREATE INDEX idx_url_mappings_expires_at ON url_mappings(expires_at);
 - ✅ `create-service/src/main/java/com/shortify/create/service/PartitionManagementService.java` - Scheduled partition creation
 - ✅ `create-service/src/main/java/com/shortify/create/CreateServiceApplication.java` - Added `@EnableScheduling`
 - ✅ `create-service/src/main/resources/application.yml` - Configured `ddl-auto: update` and SQL initialization
+- ✅ `lookup-service/src/main/java/com/shortify/lookup/service/UrlCleanupService.java` - Optimized cleanup with partition pruning
+- ✅ `lookup-service/src/main/java/com/shortify/lookup/repository/LookupUrlRepository.java` - Updated queries with partition pruning optimization
 - ✅ `scripts/test-partitions/` - Test scripts for partition management and data insertion
 
 **Automatic Partition Management:**
@@ -691,6 +693,19 @@ CREATE INDEX idx_url_mappings_expires_at ON url_mappings(expires_at);
 - Creates partition only if it doesn't exist
 - No errors or duplicates: Safe to run even if partition was created on startup
 
+**Optimized Cleanup Service:**
+- `UrlCleanupService` runs daily at 2 AM to clean up unused or expired URLs
+- **Partition Pruning Optimization**: 
+  - Only checks partitions older than retention period (6 months by default) for unused URLs
+  - Uses `created_date < partitionCutoffDate` condition to enable PostgreSQL partition pruning
+  - Dramatically reduces the number of partitions scanned during cleanup
+  - For expired URLs, checks all partitions (but PostgreSQL still optimizes with partition pruning)
+- Deletes URLs that:
+  1. Haven't been accessed in the retention period (6 months) AND are in old partitions
+  2. Have expired (expiresAt < now) - checks all partitions
+- Batch processing: Deletes in batches of 1000 URLs per transaction
+- Event-driven: Publishes deletion events to Kafka for stats service cleanup
+
 **Manual Management:**
 - REST endpoints available for partition management:
   - `POST /api/v1/create/admin/partitions/create-next` - Create next month's partition
@@ -707,6 +722,11 @@ CREATE INDEX idx_url_mappings_expires_at ON url_mappings(expires_at);
 **Performance Improvements:**
 - **Query Performance**: 10-20x faster (searches smaller partitions)
 - **Cleanup Performance**: 100x faster (drop partitions vs delete rows)
+- **Optimized Cleanup with Partition Pruning**: 
+  - Cleanup service only checks partitions older than retention period (6+ months) for unused URLs
+  - Enables PostgreSQL's partition pruning, dramatically reducing partitions scanned
+  - For expired URLs, checks all partitions (but PostgreSQL still uses partition pruning)
+  - Significantly improves cleanup job performance on large datasets
 - **Maintenance**: Can work on individual partitions without affecting others
 - **Scalability**: Can handle billions of URLs efficiently
 
