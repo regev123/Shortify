@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shortify-config
+  namespace: shortify
+data:
+  # Database configuration (Kubernetes service names)
+  DB_HOST: "postgresql-primary"
+  DB_PORT: "5432"
+  DB_NAME: "shortify"
+  DB_USER: "postgres"
+  DB_STATS_HOST: "postgresql-stats"
+  DB_STATS_NAME: "shortify_stats"
+  
+  # Read replicas configuration (comma-separated list for application)
+  DB_REPLICAS: "postgresql-replica-1:5432,postgresql-replica-2:5432,postgresql-replica-3:5432"
+  
+  # Redis Cluster configuration (Kubernetes service names)
+  # For cluster mode, provide all node endpoints
+  REDIS_CLUSTER_NODES: "redis-node-1:6379,redis-node-2:6379,redis-node-3:6379,redis-node-4:6379,redis-node-5:6379,redis-node-6:6379"
+  # For single node access (fallback)
+  REDIS_HOST: "redis-cluster"
+  REDIS_PORT: "6379"
+  
+  # Kafka Cluster configuration (Kubernetes service names)
+  # For cluster mode, provide all broker endpoints
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-broker-1:9092,kafka-broker-2:9092,kafka-broker-3:9092"
+

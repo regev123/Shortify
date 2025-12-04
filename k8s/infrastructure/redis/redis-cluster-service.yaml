@@ -1,0 +1,21 @@
+# Service that aggregates all Redis cluster nodes for service discovery
+# Applications can use this service name to connect to any cluster node
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: shortify
+spec:
+  type: ClusterIP
+  selector:
+    role: redis-cluster
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  - port: 16379
+    targetPort: 16379
+    protocol: TCP
+    name: cluster
+

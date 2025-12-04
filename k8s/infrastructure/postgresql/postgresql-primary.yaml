@@ -1,0 +1,195 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-primary-pvc
+  namespace: shortify
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-primary
+  namespace: shortify
+spec:
+  serviceName: postgresql-primary
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql-primary
+  template:
+    metadata:
+      labels:
+        app: postgresql-primary
+    spec:
+      securityContext:
+        fsGroup: 999
+      initContainers:
+      - name: init-db
+        image: postgres:15-alpine
+        securityContext:
+          runAsUser: 0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Initializing PostgreSQL data directory..."
+          if [ -d /var/lib/postgresql/data ] && [ "$(ls -A /var/lib/postgresql/data 2>/dev/null)" ]; then
+            echo "Cleaning existing data directory..."
+            rm -rf /var/lib/postgresql/data/*
+          fi
+          mkdir -p /var/lib/postgresql/data
+          mkdir -p /var/run/postgresql
+          chown -R 999:999 /var/lib/postgresql/data
+          chown -R 999:999 /var/run/postgresql
+          chmod 700 /var/lib/postgresql/data
+          chmod 755 /var/run/postgresql
+          echo "Data directory initialized and permissions set"
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 5432
+          name: postgresql
+        env:
+        - name: POSTGRES_DB
+          value: shortify
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: POSTGRES_REPLICATION_USER
+          value: replicator
+        - name: POSTGRES_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: replication-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "scram-sha-256"
+        args:
+        - -c
+        - wal_level=replica
+        - -c
+        - max_wal_senders=5
+        - -c
+        - max_replication_slots=5
+        - -c
+        - hot_standby=on
+        - -c
+        - wal_keep_size=1GB
+        - -c
+        - max_wal_size=2GB
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+      - name: replication-configurator
+        image: postgres:15-alpine
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Replication configurator starting..."
+          while true; do
+            if pg_isready -U postgres -h localhost 2>/dev/null; then
+              echo "PostgreSQL is ready, configuring replication..."
+              
+              # Add replication entries to pg_hba.conf if not present
+              if ! grep -q "host replication replicator" /var/lib/postgresql/data/pg_hba.conf; then
+                echo "host replication replicator 0.0.0.0/0 scram-sha-256" >> /var/lib/postgresql/data/pg_hba.conf
+                echo "host replication postgres 0.0.0.0/0 scram-sha-256" >> /var/lib/postgresql/data/pg_hba.conf
+                echo "Added replication entries to pg_hba.conf"
+              fi
+              
+              # Create replicator user if it doesn't exist
+              psql -U postgres -h localhost -c "SELECT 1 FROM pg_roles WHERE rolname='replicator'" 2>/dev/null | grep -q 1 || \
+              psql -U postgres -h localhost -c "CREATE USER replicator WITH REPLICATION PASSWORD 'replication';" 2>/dev/null
+              
+              # Reload PostgreSQL configuration
+              psql -U postgres -h localhost -c "SELECT pg_reload_conf();" 2>/dev/null
+              
+              echo "Replication configuration complete"
+              sleep 60  # Check every minute
+            else
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 2
+            fi
+          done
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+      volumes:
+      - name: postgresql-storage
+        persistentVolumeClaim:
+          claimName: postgresql-primary-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-primary
+  namespace: shortify
+spec:
+  type: ClusterIP
+  selector:
+    app: postgresql-primary
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+

@@ -1,6 +1,6 @@
 # Shortify Service
 
-🚀 **Enterprise-Grade URL Shortening Platform** — A high-performance, production-ready microservices architecture designed to handle **100M+ requests per day** with sub-millisecond latency. Built with **Spring Boot 3.2**, featuring **distributed PostgreSQL with read replicas** (1 primary + 3 replicas) for horizontal read scaling, **Redis cluster** (3 masters + 3 replicas) for high-availability distributed caching, **Kafka cluster** (3 brokers) for event-driven real-time analytics, and **Snowflake ID generation** for distributed unique code creation without database collisions. Includes **automatic database partitioning** with partition pruning optimization, **event-driven cleanup** with Kafka integration, and a modern **React + Tailwind CSS** frontend. Architected with **100% SOLID principles compliance**, clean code practices, and designed for **horizontal scalability** supporting billions of URLs with automatic partition management and optimized query performance.
+🚀 **Enterprise-Grade URL Shortening Platform** — A high-performance, production-ready microservices architecture designed to handle **100M+ requests per day** with sub-millisecond latency. Built with **Spring Boot 3.2**, featuring **distributed PostgreSQL with read replicas** (1 primary + 3 replicas) for horizontal read scaling, **Redis cluster** (3 masters + 3 replicas) for high-availability distributed caching, **Kafka cluster** (3 brokers) for event-driven real-time analytics, and **Snowflake ID generation** for distributed unique code creation without database collisions. Includes **automatic database partitioning** with partition pruning optimization, **event-driven cleanup** with Kafka integration, **complete Kubernetes deployment** with auto-scaling and health probes, and a modern **React + Tailwind CSS** frontend. Architected with **100% SOLID principles compliance**, clean code practices, and designed for **horizontal scalability** supporting billions of URLs with automatic partition management and optimized query performance.
 
 > **Note:** This project is inspired by [TinyURL](https://tinyurl.com/), the popular URL shortening service.
 
@@ -8,6 +8,7 @@
 
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.34+-326CE5.svg)](https://kubernetes.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7+-red.svg)](https://redis.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -21,6 +22,7 @@
 - [Architecture](#-architecture)
 - [SOLID Principles](#-solid-principles)
 - [Getting Started](#-getting-started)
+- [Kubernetes Deployment](#️-kubernetes-deployment)
 - [Database Setup](#-database-setup)
 - [API Documentation](#-api-documentation)
 - [Implementation Highlights](#-implementation-highlights)
@@ -510,6 +512,137 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    - **Home Page**: Shorten long URLs
    - **Analytics Page**: View URL statistics and platform-wide analytics
 
+## ☸️ Kubernetes Deployment
+
+### Quick Start with Kubernetes
+
+The project includes a complete Kubernetes deployment configuration for production-ready deployment:
+
+```powershell
+# Deploy all services to Kubernetes
+cd k8s/scripts
+.\deploy-all.ps1
+```
+
+This script will:
+1. ✅ Build Docker images for all services
+2. ✅ Create Kubernetes namespace (`shortify`)
+3. ✅ Deploy infrastructure (PostgreSQL, Redis, Kafka, Zookeeper)
+4. ✅ Deploy application services (API Gateway, Create, Lookup, Stats)
+5. ✅ Configure ConfigMaps and Secrets
+6. ✅ Set up Ingress for external access
+7. ✅ Configure Horizontal Pod Autoscalers (HPA)
+
+### Kubernetes Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                   │
+│                    (Namespace: shortify)                 │
+└─────────────────────────────────────────────────────────┘
+│
+├── Infrastructure Services
+│   ├── PostgreSQL Primary (StatefulSet)
+│   ├── PostgreSQL Replicas (3x StatefulSet)
+│   ├── PostgreSQL Stats (StatefulSet)
+│   ├── Redis Cluster (6x StatefulSet - 3 masters + 3 replicas)
+│   ├── Kafka Cluster (3x StatefulSet - brokers)
+│   └── Zookeeper (StatefulSet)
+│
+├── Application Services
+│   ├── API Gateway (Deployment - 3 replicas)
+│   ├── Create Service (Deployment - 2 replicas)
+│   ├── Lookup Service (Deployment - 5 replicas)
+│   └── Stats Service (Deployment - 2 replicas)
+│
+├── Auto-Scaling
+│   ├── API Gateway HPA (2-10 replicas)
+│   ├── Create Service HPA (2-5 replicas)
+│   ├── Lookup Service HPA (5-20 replicas)
+│   └── Stats Service HPA (2-5 replicas)
+│
+└── Networking
+    ├── Services (ClusterIP)
+    └── Ingress (NGINX)
+```
+
+### Accessing Services in Kubernetes
+
+**Port-Forwarding (for local access):**
+```powershell
+# API Gateway
+.\k8s\services\k8s-port-forward.ps1
+# Select option 1 for API Gateway or option 3 for all services
+
+# Redis (for Redis Desktop Manager)
+kubectl port-forward svc/redis-cluster 6379:6379 -n shortify
+
+# PostgreSQL (for pgAdmin)
+kubectl port-forward svc/postgresql-primary 5433:5432 -n shortify
+```
+
+**Via Ingress:**
+- API Gateway: `http://shortify.local` (add to hosts file: `127.0.0.1 shortify.local`)
+
+### Kubernetes Features
+
+- ✅ **High Availability**: Multiple replicas for all services
+- ✅ **Auto-Scaling**: Horizontal Pod Autoscalers based on CPU/memory
+- ✅ **Health Checks**: Liveness and readiness probes for all services
+- ✅ **Resource Management**: CPU and memory limits/requests configured
+- ✅ **Persistent Storage**: StatefulSets with PersistentVolumeClaims
+- ✅ **Service Discovery**: Kubernetes DNS for inter-service communication
+- ✅ **Configuration Management**: ConfigMaps and Secrets
+- ✅ **Load Balancing**: Kubernetes Services with automatic load balancing
+
+### Stopping Kubernetes Deployment
+
+```powershell
+cd k8s/scripts
+.\stop-all.ps1
+```
+
+### Kubernetes Directory Structure
+
+```
+k8s/
+├── config/                    # Configuration files
+│   ├── namespace.yaml         # Kubernetes namespace
+│   ├── configmap.yaml         # Application configuration
+│   └── ingress.yaml           # Ingress configuration
+├── infrastructure/            # Infrastructure services
+│   ├── postgresql/            # PostgreSQL deployments
+│   ├── redis/                 # Redis cluster deployments
+│   └── kafka/                 # Kafka cluster deployments
+├── services/                  # Application services
+│   ├── api-gateway-deployment.yaml
+│   ├── create-service-deployment.yaml
+│   ├── lookup-service-deployment.yaml
+│   ├── stats-service-deployment.yaml
+│   └── *-hpa.yaml            # Horizontal Pod Autoscalers
+└── scripts/                   # Deployment scripts
+    ├── deploy-all.ps1         # Deploy everything
+    └── stop-all.ps1           # Stop everything
+```
+
+### Prerequisites for Kubernetes
+
+- **Kubernetes Cluster**: Docker Desktop (includes Kubernetes) or any K8s cluster
+- **kubectl**: Kubernetes command-line tool
+- **Docker**: For building container images
+- **Maven**: For building Java applications
+
+### Production Considerations
+
+- ✅ **Resource Limits**: Configured for all pods
+- ✅ **Health Probes**: Liveness and readiness checks
+- ✅ **Auto-Scaling**: HPA configured for dynamic scaling
+- ✅ **Persistent Storage**: StatefulSets with PVCs for databases
+- ✅ **Service Mesh Ready**: Can integrate with Istio/Linkerd
+- ✅ **Monitoring Ready**: Exposes metrics via Spring Boot Actuator
+
+For detailed scalability information, see [SCALABILITY_PLAN.md](SCALABILITY_PLAN.md).
+
 ## 🗄 Database Setup
 
 ### Quick Start with Docker Compose
@@ -593,18 +726,18 @@ The frontend will be available at `http://localhost:5173`
 #### Home Page - URL Shortening
 
 **Creating a Short URL:**
-![Long To Short URL Creation](Long%20To%20Short%20URL%20Creation.png)
+![Long To Short URL Creation](images/Long%20To%20Short%20URL%20Creation.png)
 
 **Short URL Result:**
-![Short Url From Long URL](Short%20Url%20From%20Long%20URL.png)
+![Short Url From Long URL](images/Short%20Url%20From%20Long%20URL.png)
 
 #### Analytics Dashboard
 
 **URL Statistics:**
-![URL Statistics](URL%20Statistics.png)
+![URL Statistics](images/URL%20Statistics.png)
 
 **Platform Statistics:**
-![Platform Statistics](Platform%20Statistics.png)
+![Platform Statistics](images/Platform%20Statistics.png)
 
 ## 📚 API Documentation
 
@@ -1365,8 +1498,8 @@ mvn test jacoco:report
 
 ### DevOps
 
-- [ ] Docker containerization
-- [ ] Kubernetes deployment
+- [x] Docker containerization ✅
+- [x] Kubernetes deployment ✅
 - [ ] CI/CD pipeline
 - [ ] Monitoring with Prometheus
 - [ ] Logging with ELK stack

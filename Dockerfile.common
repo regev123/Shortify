@@ -1,0 +1,40 @@
+# Multi-stage Dockerfile template for Spring Boot services
+# Usage: Copy this file to each service directory and customize as needed
+
+# Stage 1: Build
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+
+# Copy parent POM and common module first
+COPY pom.xml .
+COPY common/pom.xml common/
+COPY common/src common/src
+
+# Copy service-specific files
+COPY ${SERVICE_MODULE}/pom.xml ${SERVICE_MODULE}/
+COPY ${SERVICE_MODULE}/src ${SERVICE_MODULE}/src
+
+# Build the project
+RUN mvn clean package -DskipTests -pl ${SERVICE_MODULE} -am
+
+# Stage 2: Runtime
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# Copy JAR from build stage
+COPY --from=build /app/${SERVICE_MODULE}/target/*.jar app.jar
+
+# Expose port (will be overridden in docker-compose)
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${SERVER_PORT:-8080}/actuator/health || exit 1
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]
+

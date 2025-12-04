@@ -1,6 +1,13 @@
 # Load Test Script for Lookup Service (via API Gateway)
 # Reads all URLs from the lookup service through the API Gateway 5 times
-# Run: .\load-test-lookup-service.ps1
+# 
+# Usage:
+#   Local: .\load-test-lookup-service.ps1
+#   Kubernetes (port-forward): .\load-test-lookup-service.ps1 -ApiGatewayUrl "http://localhost:8080"
+#   Kubernetes (ingress): .\load-test-lookup-service.ps1 -ApiGatewayUrl "http://shortify.local"
+#
+# For Kubernetes, first set up port-forward:
+#   kubectl port-forward svc/api-gateway 8080:8080 -n shortify
 #
 # Performance Optimizations:
 # - Increased default concurrency from 20 to 100 parallel requests
@@ -14,7 +21,8 @@ param(
     [int]$Iterations = 5,
     [string]$ApiGatewayUrl = "http://localhost:8080",
     [string]$ShortUrlsFile = "short-urls.txt",
-    [int]$Concurrency = 100  # Number of parallel requests (increased from 20 for better performance)
+    [int]$Concurrency = 100,  # Number of parallel requests (increased from 20 for better performance)
+    [switch]$Kubernetes = $false  # Set to true if running in Kubernetes
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -25,7 +33,13 @@ Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  API Gateway URL: $ApiGatewayUrl" -ForegroundColor White
 Write-Host "  Iterations: $Iterations" -ForegroundColor White
 Write-Host "  Concurrency: $Concurrency parallel requests" -ForegroundColor White
-Write-Host "  Short URLs File: $ShortUrlsFile`n" -ForegroundColor White
+Write-Host "  Short URLs File: $ShortUrlsFile" -ForegroundColor White
+if ($Kubernetes) {
+    Write-Host "  Mode: Kubernetes" -ForegroundColor Cyan
+} else {
+    Write-Host "  Mode: Local" -ForegroundColor Gray
+}
+Write-Host ""
 
 # Check if API Gateway and lookup service are running
 Write-Host "[1/5] Checking API Gateway and lookup service health..." -ForegroundColor Yellow
@@ -38,9 +52,24 @@ try {
     }
 } catch {
     Write-Host "  ERROR: API Gateway is not reachable at $ApiGatewayUrl" -ForegroundColor Red
-    Write-Host "  Please make sure:" -ForegroundColor Yellow
-    Write-Host "    1. API Gateway is running on port 8080" -ForegroundColor Yellow
-    Write-Host "    2. Lookup service is running on port 8082`n" -ForegroundColor Yellow
+    Write-Host ""
+    if ($Kubernetes -or $ApiGatewayUrl -like "*localhost*") {
+        Write-Host "  Kubernetes Setup Instructions:" -ForegroundColor Yellow
+        Write-Host "  1. Set up port-forward (in a separate terminal):" -ForegroundColor White
+        Write-Host "     kubectl port-forward svc/api-gateway 8080:8080 -n shortify" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  2. Or use ingress (if configured):" -ForegroundColor White
+        Write-Host "     Add to hosts file: 127.0.0.1 shortify.local" -ForegroundColor Cyan
+        Write-Host "     Then use: -ApiGatewayUrl 'http://shortify.local'" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  3. Verify services are running:" -ForegroundColor White
+        Write-Host "     kubectl get pods -n shortify -l app=api-gateway" -ForegroundColor Cyan
+        Write-Host "     kubectl get pods -n shortify -l app=lookup-service" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Please make sure:" -ForegroundColor Yellow
+        Write-Host "    1. API Gateway is running on port 8080" -ForegroundColor Yellow
+        Write-Host "    2. Lookup service is running on port 8082`n" -ForegroundColor Yellow
+    }
     exit 1
 }
 

@@ -1,0 +1,21 @@
+# Service that aggregates all Kafka brokers for service discovery
+# Applications can use this service name to connect to any broker
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-cluster
+  namespace: shortify
+spec:
+  type: ClusterIP
+  selector:
+    role: kafka-cluster
+  ports:
+  - port: 9092
+    targetPort: 9092
+    protocol: TCP
+    name: kafka
+  - port: 29092
+    targetPort: 29092
+    protocol: TCP
+    name: kafka-internal
+

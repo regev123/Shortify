@@ -1,12 +1,20 @@
 # Load Test Script for Create Service (via API Gateway)
-# Sends 10,000 URLs to the create service through the API Gateway
-# Run: .\load-test-create-service.ps1
+# Sends URLs to the create service through the API Gateway
+# 
+# Usage:
+#   Local: .\load-test-create-service.ps1
+#   Kubernetes (port-forward): .\load-test-create-service.ps1 -CreateServiceUrl "http://localhost:8080"
+#   Kubernetes (ingress): .\load-test-create-service.ps1 -CreateServiceUrl "http://shortify.local"
+#
+# For Kubernetes, first set up port-forward:
+#   kubectl port-forward svc/api-gateway 8080:8080 -n shortify
 
 param(
-    [int]$UrlCount = 1000000000,
+    [int]$UrlCount = 100000,
     [string]$CreateServiceUrl = "http://localhost:8080",
     [string]$OutputFile = "short-urls.txt",
-    [int]$Concurrency = 20  # Number of parallel requests
+    [int]$Concurrency = 20,  # Number of parallel requests
+    [switch]$Kubernetes = $false  # Set to true if running in Kubernetes
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -17,7 +25,13 @@ Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  API Gateway URL: $CreateServiceUrl" -ForegroundColor White
 Write-Host "  Number of URLs: $UrlCount" -ForegroundColor White
 Write-Host "  Concurrency: $Concurrency parallel requests" -ForegroundColor White
-Write-Host "  Output File: $OutputFile`n" -ForegroundColor White
+Write-Host "  Output File: $OutputFile" -ForegroundColor White
+if ($Kubernetes) {
+    Write-Host "  Mode: Kubernetes" -ForegroundColor Cyan
+} else {
+    Write-Host "  Mode: Local" -ForegroundColor Gray
+}
+Write-Host ""
 
 # Check if API Gateway and create service are running
 Write-Host "[1/4] Checking API Gateway and create service health..." -ForegroundColor Yellow
@@ -30,7 +44,21 @@ try {
     }
 } catch {
     Write-Host "  ERROR: Create service is not reachable at $CreateServiceUrl" -ForegroundColor Red
-    Write-Host "  Please make sure the API Gateway is running on port 8080`n" -ForegroundColor Yellow
+    Write-Host ""
+    if ($Kubernetes -or $CreateServiceUrl -like "*localhost*") {
+        Write-Host "  Kubernetes Setup Instructions:" -ForegroundColor Yellow
+        Write-Host "  1. Set up port-forward (in a separate terminal):" -ForegroundColor White
+        Write-Host "     kubectl port-forward svc/api-gateway 8080:8080 -n shortify" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  2. Or use ingress (if configured):" -ForegroundColor White
+        Write-Host "     Add to hosts file: 127.0.0.1 shortify.local" -ForegroundColor Cyan
+        Write-Host "     Then use: -CreateServiceUrl 'http://shortify.local'" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  3. Verify service is running:" -ForegroundColor White
+        Write-Host "     kubectl get pods -n shortify -l app=api-gateway" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Please make sure the API Gateway is running and accessible at $CreateServiceUrl`n" -ForegroundColor Yellow
+    }
     exit 1
 }
 

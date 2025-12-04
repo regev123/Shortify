@@ -1,0 +1,63 @@
+# Job to initialize Redis cluster after all nodes are ready
+# This job runs redis-cli --cluster create to form the cluster
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+  namespace: shortify
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: redis-cluster-init
+        image: redis:7.2-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Waiting for all Redis nodes to be ready..."
+          
+          # Wait for all nodes to be ready
+          for i in 1 2 3 4 5 6; do
+            until redis-cli -h redis-node-$i ping > /dev/null 2>&1; do
+              echo "Waiting for redis-node-$i..."
+              sleep 2
+            done
+            echo "redis-node-$i is ready"
+          done
+          
+          echo "All nodes are ready. Checking if cluster is already initialized..."
+          
+          # Check if cluster is already initialized
+          if redis-cli -h redis-node-1 cluster info | grep -q "cluster_state:ok"; then
+            echo "Cluster is already initialized. Skipping..."
+            exit 0
+          fi
+          
+          echo "Initializing Redis cluster..."
+          # Create cluster: 3 masters, 3 replicas (1 replica per master)
+          redis-cli --cluster create \
+            redis-node-1:6379 \
+            redis-node-2:6379 \
+            redis-node-3:6379 \
+            redis-node-4:6379 \
+            redis-node-5:6379 \
+            redis-node-6:6379 \
+            --cluster-replicas 1 \
+            --cluster-yes
+          
+          echo "Redis cluster initialized successfully!"
+          
+          # Verify cluster status
+          redis-cli -h redis-node-1 cluster info
+          redis-cli -h redis-node-1 cluster nodes
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+

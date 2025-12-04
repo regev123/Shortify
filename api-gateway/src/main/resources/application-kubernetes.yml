@@ -1,0 +1,116 @@
+# Kubernetes-specific configuration for API Gateway
+# This file is used when SPRING_PROFILES_ACTIVE=kubernetes
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        # -------------------------
+        # HEALTH CHECK ROUTES (must be first)
+        # Using Kubernetes service names instead of localhost
+        # -------------------------
+        # CREATE SERVICE HEALTH
+        - id: create-service-health
+          uri: http://create-service:8081
+          order: -1
+          predicates:
+            - Path=/health/create
+          filters:
+            - SetPath=/actuator/health
+
+        - id: create-service-readiness
+          uri: http://create-service:8081
+          order: -1
+          predicates:
+            - Path=/health/create/readiness
+          filters:
+            - SetPath=/actuator/health/readiness
+
+        - id: create-service-liveness
+          uri: http://create-service:8081
+          order: -1
+          predicates:
+            - Path=/health/create/liveness
+          filters:
+            - SetPath=/actuator/health/liveness
+
+        # LOOKUP SERVICE HEALTH
+        - id: lookup-service-health
+          uri: http://lookup-service:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup
+          filters:
+            - SetPath=/actuator/health
+
+        - id: lookup-service-readiness
+          uri: http://lookup-service:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup/readiness
+          filters:
+            - SetPath=/actuator/health/readiness
+
+        - id: lookup-service-liveness
+          uri: http://lookup-service:8082
+          order: -1
+          predicates:
+            - Path=/health/lookup/liveness
+          filters:
+            - SetPath=/actuator/health/liveness
+
+        # STATS SERVICE HEALTH
+        - id: stats-service-health
+          uri: http://stats-service:8083
+          order: -1
+          predicates:
+            - Path=/health/stats
+          filters:
+            - SetPath=/actuator/health
+
+        - id: stats-service-readiness
+          uri: http://stats-service:8083
+          order: -1
+          predicates:
+            - Path=/health/stats/readiness
+          filters:
+            - SetPath=/actuator/health/readiness
+
+        - id: stats-service-liveness
+          uri: http://stats-service:8083
+          order: -1
+          predicates:
+            - Path=/health/stats/liveness
+          filters:
+            - SetPath=/actuator/health/liveness
+
+        # -------------------------
+        # CREATE SERVICE (business)
+        # -------------------------
+        - id: create-service
+          uri: http://create-service:8081
+          predicates:
+            - Path=/api/v1/create/**
+          filters:
+            - AddRequestHeader=X-Gateway-Service, create-service
+
+        # -------------------------
+        # LOOKUP SERVICE (short URL)
+        # -------------------------
+        - id: lookup-service-short-url
+          uri: http://lookup-service:8082
+          predicates:
+            - Path=/{shortUrl:[a-zA-Z0-9]+}
+          filters:
+            - AddRequestHeader=X-Gateway-Service, lookup-service
+
+        # -------------------------
+        # STATS SERVICE (analytics)
+        # -------------------------
+        - id: stats-service
+          uri: http://stats-service:8083
+          predicates:
+            - Path=/api/v1/stats/**
+          filters:
+            - AddRequestHeader=X-Gateway-Service, stats-service
+

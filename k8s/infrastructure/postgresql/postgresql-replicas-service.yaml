@@ -1,0 +1,19 @@
+# Headless service for all PostgreSQL read replicas
+# This allows service discovery of all replicas
+# Applications can use individual replica services or this aggregator
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-replicas
+  namespace: shortify
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for DNS-based discovery
+  selector:
+    role: postgresql-replica
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+

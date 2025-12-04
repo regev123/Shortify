@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-replica-1-pvc
+  namespace: shortify
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-replica-1
+  namespace: shortify
+spec:
+  serviceName: postgresql-replica-1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql-replica-1
+  template:
+    metadata:
+      labels:
+        app: postgresql-replica-1
+        role: postgresql-replica  # Common label for aggregator service
+    spec:
+      securityContext:
+        fsGroup: 999
+      initContainers:
+      - name: init-replica
+        image: postgres:15-alpine
+        securityContext:
+          runAsUser: 0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Waiting for primary to be ready..."
+          until PGPASSWORD=$POSTGRES_PASSWORD pg_isready -h postgresql-primary -U postgres; do
+            echo "Primary not ready yet, waiting..."
+            sleep 2
+          done
+          echo "Primary is ready, checking if replica needs initialization..."
+          if [ ! -s "$PGDATA/PG_VERSION" ]; then
+            echo "Initializing replica from primary..."
+            PGPASSWORD=$REPLICATION_PASSWORD pg_basebackup -h postgresql-primary -D $PGDATA -U replicator -Fp -Xs -P -R -v
+            echo "Fixing ownership of data directory..."
+            chown -R 999:999 $PGDATA
+            chmod 700 $PGDATA
+            echo "Replica initialization complete"
+          else
+            echo "Replica data already exists, fixing ownership..."
+            chown -R 999:999 $PGDATA
+            chmod 700 $PGDATA
+          fi
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: replication-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 5432
+          name: postgresql
+        env:
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgres-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data
+        args:
+        - -c
+        - hot_standby=on
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+      volumes:
+      - name: postgresql-storage
+        persistentVolumeClaim:
+          claimName: postgresql-replica-1-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-replica-1
+  namespace: shortify
+spec:
+  type: ClusterIP
+  selector:
+    app: postgresql-replica-1
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
