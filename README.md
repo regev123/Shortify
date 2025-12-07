@@ -23,6 +23,7 @@
 - [SOLID Principles](#-solid-principles)
 - [Getting Started](#-getting-started)
 - [Kubernetes Deployment](#️-kubernetes-deployment)
+- [AWS Infrastructure (Terraform)](#️-aws-infrastructure-terraform)
 - [Database Setup](#-database-setup)
 - [API Documentation](#-api-documentation)
 - [Implementation Highlights](#-implementation-highlights)
@@ -642,6 +643,47 @@ k8s/
 - ✅ **Monitoring Ready**: Exposes metrics via Spring Boot Actuator
 
 For detailed scalability information, see [SCALABILITY_PLAN.md](SCALABILITY_PLAN.md).
+
+## ☁️ AWS Infrastructure (Terraform)
+
+This project includes **production-ready Terraform infrastructure code** for deploying to AWS using Infrastructure as Code (IaC). The configuration supports both **LocalStack** (for local testing) and **real AWS** (for production deployment).
+
+### Architecture
+
+**Hybrid Cloud Architecture:**
+- **Java Microservices** → **EKS (Elastic Kubernetes Service)**
+- **PostgreSQL** → **RDS** with read replicas (1 primary + 3 replicas)
+- **Redis** → **ElastiCache Redis Cluster** (3 masters + 3 replicas)
+- **Kafka** → **Amazon MSK** (3 brokers)
+- **Load Balancing** → **Application Load Balancer (ALB)**
+- **Storage** → **S3** for artifacts
+
+### Quick Start
+
+**LocalStack (Free Local Testing):**
+```powershell
+cd terraform/scripts
+.\start-localstack.ps1
+.\run-terraform-localstack.ps1
+```
+
+**Real AWS (Production):**
+```powershell
+cd terraform
+terraform init
+terraform plan -var-file="environments/aws/terraform.tfvars"
+terraform apply -var-file="environments/aws/terraform.tfvars"
+```
+
+### Production-Ready Features
+
+✅ **Infrastructure as Code** - Version-controlled, reproducible infrastructure  
+✅ **High Availability** - Multi-AZ deployment with automatic failover  
+✅ **Security** - Network isolation, encryption, IAM integration  
+✅ **Scalability** - Auto-scaling EKS clusters and managed services  
+✅ **Cost Optimization** - Efficient resource utilization and tagging  
+
+For detailed setup instructions, see the `terraform/` directory.
 
 ## 🗄 Database Setup
 
